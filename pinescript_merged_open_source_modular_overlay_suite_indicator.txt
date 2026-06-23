@@ -1,0 +1,1468 @@
+//@version=6
+indicator("Merged Open-Source Modular Overlay Suite", "Merged Modular Overlay", overlay = true, max_bars_back = 5000, max_boxes_count = 500, max_lines_count = 500, max_labels_count = 500)
+
+import TradingView/ta/4 as TvTa
+import LucF/ta/2 as LucfTa
+
+show_OscillatorWorkbench = input.bool(true, "Oscillator Workbench")
+show_SmartMoneyConcept = input.bool(true, "Smart Money Concept")
+show_SupportResistanceOB = input.bool(true, "Support Resistance with Order Block")
+show_OrderblocksNephewSam = input.bool(true, "Orderblocks (Nephew_Sam)")
+show_TweezerBottom = input.bool(true, "Tweezer Bottom")
+
+show_Supertrend = input.bool(true, "SuperTrend")
+show_RSI = input.bool(true, "RSI")
+show_MACD = input.bool(true, "MACD")
+show_ATRRatio = input.bool(true, "ATR Ratio")
+show_EMA = input.bool(true, "EMA")
+show_TrendlinesWithBreaks = input.bool(true, "Trendlines with Breaks")
+show_VolumaticTrend = input.bool(true, "Volumatic Trend")
+
+color OW_LIME = #00FF00ff
+color OW_LIME_MD = #00FF0090
+color OW_TEAL = #008080ff
+color OW_TEAL_MD = #00808090
+color OW_PINK = #FF0080ff
+color OW_PINK_MD = #FF008090
+color OW_MAROON = #800000ff
+color OW_MAROON_MD = #80000090
+color OW_ORANGE = #c56606ff
+color OW_ORANGE_BR = #FF8000ff
+color OW_GRAY = #808080ff
+color OW_GRAY_MD = #80808090
+
+string MA01 = "Simple MA"
+string MA02 = "Exponential MA"
+string MA03 = "Wilder MA"
+string MA04 = "Weighted MA"
+string MA05 = "Volume-weighted MA"
+string MA06 = "Arnaud Legoux MA"
+string MA07 = "Hull MA"
+string MA08 = "Symmetrically-weighted MA"
+
+string OS00 = "None"
+string OS01 = "RSI (SL)"
+string OS02 = "MACD (S)"
+string OS03 = "CCI (SL)"
+string OS04 = "Chande Momentum Oscillator (SL)"
+string OS05 = "Stochastic (SL)"
+string OS06 = "Stochastic RSI (SL)"
+string OS09 = "MFI (L)"
+string OS10 = "True Strength Index (SL)"
+string OS11 = "Williams % Range (L)"
+string OS12 = "Ultimate Oscillator (L)"
+string OS13 = "Klinger Volume Oscillator (L)"
+string OS14 = "Schaff Trend Cycle (SL)"
+string OS15 = "Volume Zone Oscillator (L)"
+string OS16 = "Price Zone Oscillator (L)"
+string OS17 = "Sentiment Zone Oscillator (SL)"
+string OS18 = "Wave Period Oscillator (L)"
+string OS19 = "Volume Buoyancy (L)"
+string OS20 = "Coppock Curve (SL)"
+string OS21 = "Aroon (L)"
+string OS22 = "DMI (L)"
+string OS23 = "TRIX (SL)"
+string OS24 = "Ease of Movement (L)"
+string OS25 = "Fisher Transform (SL)"
+string OS26 = "Signs of the Times"
+string OS27 = "Hilbert Transform (S)"
+string OS28 = "Intraday Intensity Index"
+string OS52 = "True Range"
+string OS54 = "Momentum (SL)"
+string OS55 = "Rate of Change (SL)"
+string OS90 = "Efficient Work (L)"
+
+string CAP1 = "Standard deviations"
+string CAP2 = "Multiples of ATR"
+string DIV1 = "Opposite directions of the weighted and reference lines"
+string DIV2 = "Opposite directions of the oscillator and the polarity of close to close"
+string STL1 = "Line"
+string STL2 = "Circles"
+string STL3 = "Crosses"
+string ST0 = "None"
+string ST1 = "Oscillator channel strong bull state"
+string ST2 = "Oscillator channel bull or strong bull state"
+string ST3 = "Oscillator channel strong bear state"
+string ST4 = "Oscillator channel bear or strong bear state"
+string SV0 = "None"
+string SV1 = "Divergence channel strong bull state"
+string SV2 = "Divergence channel bull or strong bull state"
+string SV3 = "Divergence channel strong bear state"
+string SV4 = "Divergence channel bear or strong bear state"
+string CB1 = "On divergences only"
+string CB2 = "On divergences and on the state of the oscillator channel"
+string CB3 = "On divergences and on the state of the divergence channel"
+string CB4 = "On divergences and on the combined state of both channels"
+string CH1 = "High and Low"
+string CH2 = "Open and Close"
+string BR1 = "`low` must breach channel's top, `high` must breach channel's bottom"
+string BR2 = "`high` must breach channel's top, `low` must breach channel's bottom"
+string BR3 = "Close"
+string BR4 = "Open"
+string BR5 = "The average of high and low (hl2)"
+string BR6 = "The average of high, low and close (hlc3)"
+string BR7 = "The average of high, low and two times the close (hlcc4)"
+string BR8 = "The average of high, low, close and open (ohlc4)"
+
+//@function         Returns the centerline value for the `type` oscillator.
+//@param type       (simple string) The type of oscillator (uses constants that must be defined earlier in the script).
+//@returns          (series float) The centerline's value.
+oscCenter(simple string type) =>
+    type == OS01 or type == OS05 or type == OS06 or type == OS09 or type == OS12 or type == OS14 ? 50. :
+    type == OS11 ? -50. :
+    0.
+
+//@function     Determines a "plot_style" to be used from a user's input.
+//@param state  (input string) The user selection string of his line style choice (depends on the `STL1`, `STL2` and `STL3` string constants).
+//@returns      (plot_style) The `style` named argument required in `plot()`.
+lineStyleFromUserInput(userSelection) =>
+    userSelection == STL1 ? plot.style_line :
+    userSelection == STL2 ? plot.style_circles :
+    userSelection == STL3 ? plot.style_cross :
+    plot.style_line
+
+method txSz(string s_jay) =>
+    s_jay == 'Tiny'   ? size.tiny   :
+    s_jay == 'Small'  ? size.small  :
+    s_jay == 'Normal' ? size.normal :
+    s_jay == 'Large'  ? size.large  :
+    s_jay == 'Huge'   ? size.huge   :
+    size.auto
+
+method lstyle(string style_jay) =>
+    style_jay == '⎯⎯⎯⎯' ? line.style_solid :
+    style_jay == '----' ? line.style_dashed :
+    line.style_dotted
+
+ow_transitionTo(series bool state) =>
+    not state[1] and state
+
+ow_macdHist(series float src) =>
+    [ow_macdLine, ow_signalLine, ow_histLine] = ta.macd(src, 12, 26, 9)
+    ow_histLine
+
+ow_kvo(simple int length) =>
+    [ow_kvoLine, ow_kvoSignal] = TvTa.kvo(length, length * 2, length / 2)
+    ow_kvoLine
+
+ow_aroonDiff(simple int length) =>
+    [ow_up, ow_dn] = TvTa.aroon(length)
+    ow_up - ow_dn
+
+ow_dmiDiff(simple int length) =>
+    [ow_up, ow_dn, ow_adx] = ta.dmi(length, length)
+    ow_up - ow_dn
+
+ow_trixLine(series float src, simple int length) =>
+    [ow_trix, ow_signal, ow_hist] = TvTa.trix(src, length, int(length * 0.66))
+    ow_trix
+
+ow_oscCalc(simple string type, series float src, simple int length) =>
+    float result =
+         type == OS00 ? na :
+         type == OS01 ? ta.rsi(src, length) :
+         type == OS02 ? ow_macdHist(src) :
+         type == OS03 ? ta.cci(src, length) :
+         type == OS04 ? ta.cmo(src, length) :
+         type == OS05 ? ta.stoch(src, high, low, length) :
+         type == OS06 ? ta.sma(ta.stoch(ta.rsi(src, length), ta.rsi(src, length), ta.rsi(src, length), length), 3) :
+         type == OS09 ? ta.mfi(hlc3, length) :
+         type == OS10 ? ta.tsi(src, length, length * 2) :
+         type == OS11 ? ta.wpr(length) :
+         type == OS12 ? TvTa.uo(length / 2, length, length * 2) :
+         type == OS13 ? ow_kvo(length) :
+         type == OS14 ? TvTa.stc(src, length, length * 2, length / 2, 3, 3) :
+         type == OS15 ? TvTa.vzo(length) :
+         type == OS16 ? TvTa.pzo(length) :
+         type == OS17 ? TvTa.szo(src, length) :
+         type == OS18 ? TvTa.wpo(length) :
+         type == OS19 ? LucfTa.buoyancy(volume, length, 1000) :
+         type == OS20 ? TvTa.coppock(src, length, length / 2, length / 2) :
+         type == OS21 ? ow_aroonDiff(length) :
+         type == OS22 ? ow_dmiDiff(length) :
+         type == OS23 ? ow_trixLine(src, length) :
+         type == OS24 ? TvTa.eom(length) :
+         type == OS25 ? TvTa.ft(src, length) :
+         type == OS26 ? LucfTa.sott() :
+         type == OS27 ? TvTa.ht(src) :
+         type == OS28 ? ta.iii :
+         type == OS52 ? ta.tr * math.sign(ta.change(close)) :
+         type == OS54 ? ta.mom(src, length) :
+         type == OS55 ? ta.roc(src, length) :
+         type == OS90 ? LucfTa.efficientWork(length) :
+         na
+    result
+
+ow_oscWeight(series float osc, simple float center = 0.0) =>
+    float ow_normalizedOsc = osc - center
+    float ow_historicalMax = math.abs(ta.max(ow_normalizedOsc))
+    float ow_historicalMin = math.abs(ta.min(ow_normalizedOsc))
+    osc > center ? ow_normalizedOsc / ow_historicalMax : osc < center ? -math.abs(ow_normalizedOsc / ow_historicalMin) : 0.
+
+ow_checkForNoVolume(simple string type) =>
+    bool ow_oscUsesVolume = type == OS09 or type == OS15 or type == OS19 or type == OS24
+    if barstate.islast and ta.cum(nz(volume)) == 0 and ow_oscUsesVolume
+        runtime.error("No volume is provided by the data vendor.")
+
+smc_delete_boxes(box[] smc_boxes) =>
+    if array.size(smc_boxes) > 0
+        for smc_i = array.size(smc_boxes) - 1 to 0
+            box.delete(array.get(smc_boxes, smc_i))
+            array.remove(smc_boxes, smc_i)
+
+smc_delete_lines(line[] smc_lines) =>
+    if array.size(smc_lines) > 0
+        for smc_i = array.size(smc_lines) - 1 to 0
+            line.delete(array.get(smc_lines, smc_i))
+            array.remove(smc_lines, smc_i)
+
+smc_delete_labels(label[] smc_labels) =>
+    if array.size(smc_labels) > 0
+        for smc_i = array.size(smc_labels) - 1 to 0
+            label.delete(array.get(smc_labels, smc_i))
+            array.remove(smc_labels, smc_i)
+
+srob_delete_boxes(box[] srob_boxes) =>
+    if array.size(srob_boxes) > 0
+        for srob_i = array.size(srob_boxes) - 1 to 0
+            box.delete(array.get(srob_boxes, srob_i))
+            array.remove(srob_boxes, srob_i)
+
+srob_delete_lines(line[] srob_lines) =>
+    if array.size(srob_lines) > 0
+        for srob_i = array.size(srob_lines) - 1 to 0
+            line.delete(array.get(srob_lines, srob_i))
+            array.remove(srob_lines, srob_i)
+
+obs_delete_lines(line[] obs_lines) =>
+    if array.size(obs_lines) > 0
+        for obs_i = array.size(obs_lines) - 1 to 0
+            line.delete(array.get(obs_lines, obs_i))
+            array.remove(obs_lines, obs_i)
+
+obs_delete_labels(label[] obs_labels) =>
+    if array.size(obs_labels) > 0
+        for obs_i = array.size(obs_labels) - 1 to 0
+            label.delete(array.get(obs_labels, obs_i))
+            array.remove(obs_labels, obs_i)
+
+string ow_grp1 = "OW Oscillators and Relative Volume"
+string ow_osc1TypeInput = input.string(OS01, "Oscillator 1", group = ow_grp1, inline = "owosc1", options = [OS00, OS21, OS03, OS04, OS20, OS22, OS24, OS90, OS25, OS27, OS28, OS13, OS02, OS09, OS54, OS16, OS55, OS01, OS14, OS17, OS26, OS05, OS06, OS23, OS52, OS10, OS12, OS19, OS15, OS18, OS11])
+string ow_osc1SourceInput = input.string("close", "", group = ow_grp1, inline = "owosc1", options = ["open", "high", "low", "close", "hl2", "hlc3", "ohlc4", "hlcc4", "volume"])
+int ow_osc1LengthInput = input.int(20, "Length", group = ow_grp1, inline = "owosc1", minval = 2)
+string ow_osc2TypeInput = input.string(OS00, "Oscillator 2", group = ow_grp1, inline = "owosc2", options = [OS00, OS21, OS03, OS04, OS20, OS22, OS24, OS90, OS25, OS27, OS28, OS13, OS02, OS09, OS54, OS16, OS55, OS01, OS14, OS17, OS26, OS05, OS06, OS23, OS52, OS10, OS12, OS19, OS15, OS18, OS11])
+string ow_osc2SourceInput = input.string("close", "", group = ow_grp1, inline = "owosc2", options = ["open", "high", "low", "close", "hl2", "hlc3", "ohlc4", "hlcc4", "volume"])
+int ow_osc2LengthInput = input.int(20, "Length", group = ow_grp1, inline = "owosc2", minval = 2)
+bool ow_oscXInput = input.bool(false, "Oscillator 3 (external)", group = ow_grp1, inline = "owoscx")
+float ow_oscXSourceInput = input.source(close, "", group = ow_grp1, inline = "owoscx")
+float ow_oscXCenterInput = input.float(0., "Center", group = ow_grp1, inline = "owoscx")
+bool ow_useRelVolWeightInput = input.bool(false, "Use relative volume weight", group = ow_grp1, inline = "owrel")
+int ow_relVolLookbackInput = input.int(100, "", group = ow_grp1, inline = "owrel", minval = 2)
+
+string ow_grp2 = "OW Oscillator Channel"
+bool ow_reflLineShowInput = input.bool(false, "Reference line", group = ow_grp2, inline = "owref")
+int ow_refLineWidthInput = input.int(1, "Width", group = ow_grp2, inline = "owref", minval = 1)
+string ow_refLineStyleInput = input.string(STL1, "", group = ow_grp2, inline = "owref", options = [STL1, STL2, STL3])
+color ow_refLineUpUpColorInput = input.color(OW_LIME, "UpUp", group = ow_grp2, inline = "owrefc")
+color ow_refLineDnDnColorInput = input.color(OW_PINK, "DnDn", group = ow_grp2, inline = "owrefc")
+color ow_refLineUpColorInput = input.color(OW_TEAL, "Up", group = ow_grp2, inline = "owrefc")
+color ow_refLineDnColorInput = input.color(OW_MAROON, "Dn", group = ow_grp2, inline = "owrefc")
+string ow_refTypeInput = input.string(MA06, "MA", group = ow_grp2, inline = "owma", options = [MA01, MA02, MA03, MA04, MA05, MA06, MA07, MA08])
+string ow_refSourceInput = input.string("close", "", group = ow_grp2, inline = "owma", options = ["open", "high", "low", "close", "hl2", "hlc3", "ohlc4", "hlcc4", "volume"])
+int ow_refLengthInput = input.int(20, "Length", group = ow_grp2, inline = "owma", minval = 2)
+bool ow_osclLineShowInput = input.bool(false, "Weighted line", group = ow_grp2, inline = "owosc")
+int ow_oscLineWidthInput = input.int(2, "Width", group = ow_grp2, inline = "owosc", minval = 1)
+string ow_oscLineStyleInput = input.string(STL1, "", group = ow_grp2, inline = "owosc", options = [STL1, STL2, STL3])
+color ow_oscLineUpUpColorInput = input.color(OW_LIME, "UpUp", group = ow_grp2, inline = "owoscc")
+color ow_oscLineDnDnColorInput = input.color(OW_PINK, "DnDn", group = ow_grp2, inline = "owoscc")
+color ow_oscLineUpColorInput = input.color(OW_TEAL, "Up", group = ow_grp2, inline = "owoscc")
+color ow_oscLineDnColorInput = input.color(OW_MAROON, "Dn", group = ow_grp2, inline = "owoscc")
+float ow_oscChannelCapInput = input.float(3.0, "Cap", group = ow_grp2, inline = "owcap", minval = 1, step = 0.5)
+string ow_oscChannelCapModeInput = input.string(CAP1, "", group = ow_grp2, inline = "owcap", options = [CAP1, CAP2])
+bool ow_oscChannelShowInput = input.bool(false, "Oscillator channel", group = ow_grp2, inline = "owfill")
+color ow_oscChannelUpUpColorInput = input.color(OW_LIME_MD, "UpUp", group = ow_grp2, inline = "owfill")
+color ow_oscChannelDnDnColorInput = input.color(OW_PINK_MD, "DnDn", group = ow_grp2, inline = "owfill")
+color ow_oscChannelUpColorInput = input.color(OW_TEAL_MD, "Up", group = ow_grp2, inline = "owfill")
+color ow_oscChannelDnColorInput = input.color(OW_MAROON_MD, "Dn", group = ow_grp2, inline = "owfill")
+
+string ow_grp3 = "OW Divergence"
+bool ow_divLinesShowInput = input.bool(true, "Divergence levels", group = ow_grp3, inline = "owdiv")
+int ow_divLinesWidthInput = input.int(1, "Width", group = ow_grp3, inline = "owdiv", minval = 1)
+string ow_divLinesStyleInput = input.string(STL1, "", group = ow_grp3, inline = "owdiv", options = [STL1, STL2, STL3])
+color ow_divLinesUpUpColorInput = input.color(OW_LIME, "UpUp", group = ow_grp3, inline = "owdivc")
+color ow_divLinesDnDnColorInput = input.color(OW_PINK, "DnDn", group = ow_grp3, inline = "owdivc")
+color ow_divLinesUpColorInput = input.color(OW_TEAL, "Up", group = ow_grp3, inline = "owdivc")
+color ow_divLinesDnColorInput = input.color(OW_MAROON, "Dn", group = ow_grp3, inline = "owdivc")
+color ow_divLinesNtColorInput = input.color(OW_GRAY, "Neutral", group = ow_grp3, inline = "owdivc")
+bool ow_divChannelShowInput = input.bool(false, "Divergence channel", group = ow_grp3, inline = "owdivf")
+color ow_divChannelUpUpColorInput = input.color(OW_LIME_MD, "UpUp", group = ow_grp3, inline = "owdivf")
+color ow_divChannelDnDnColorInput = input.color(OW_PINK_MD, "DnDn", group = ow_grp3, inline = "owdivf")
+color ow_divChannelUpColorInput = input.color(OW_TEAL_MD, "Up", group = ow_grp3, inline = "owdivf")
+color ow_divChannelDnColorInput = input.color(OW_MAROON_MD, "Dn", group = ow_grp3, inline = "owdivf")
+color ow_divChannelNtColorInput = input.color(OW_GRAY_MD, "Neutral", group = ow_grp3, inline = "owdivf")
+string ow_divChannelLevelsInput = input.string(CH1, "Levels source", group = ow_grp3, options = [CH1, CH2])
+string ow_divChannelBreachesInput = input.string(BR1, "Breach source", group = ow_grp3, options = [BR1, BR2, BR3, BR4, BR5, BR6, BR7, BR8])
+string ow_divDetectionModeInput = input.string(DIV1, "Divergence detection", group = ow_grp3, options = [DIV1, DIV2])
+bool ow_divChannelBiasInput = input.bool(false, "Estimate unbreached channel bias", group = ow_grp3)
+bool ow_charDivShowInput = input.bool(false, "Divergence mark", group = ow_grp3, inline = "owchar")
+string ow_charDivInput = input.string("•", "", group = ow_grp3, inline = "owchar")
+color ow_charDivColorInput = input.color(OW_ORANGE, "", group = ow_grp3, inline = "owchar")
+bool ow_charDivAboveInput = input.bool(true, "Above", group = ow_grp3, inline = "owchar")
+
+string ow_grp4 = "OW Bar Coloring and Markers"
+bool ow_barColorsShowInput = input.bool(true, "Color bars", group = ow_grp4, inline = "owbar")
+string ow_colorBarModeInput = input.string(CB2, "", group = ow_grp4, inline = "owbar", options = [CB1, CB2, CB3, CB4])
+bool ow_barsEmptyOnDecVolInput = input.bool(false, "Don't color falling volume bars", group = ow_grp4)
+color ow_barsUpUpColorInput = input.color(OW_LIME, "UpUp", group = ow_grp4, inline = "owbarc")
+color ow_barsDnDnColorInput = input.color(OW_PINK, "DnDn", group = ow_grp4, inline = "owbarc")
+color ow_barsUpColorInput = input.color(OW_TEAL, "Up", group = ow_grp4, inline = "owbarc")
+color ow_barsDnColorInput = input.color(OW_MAROON, "Dn", group = ow_grp4, inline = "owbarc")
+color ow_barsNtColorInput = input.color(OW_GRAY, "Neutral", group = ow_grp4, inline = "owbarc")
+color ow_barsDivColorInput = input.color(OW_ORANGE, "Div", group = ow_grp4, inline = "owbarc")
+string ow_markerUpOscModeInput = input.string(ST0, "Up marker oscillator state", group = ow_grp4, inline = "owmkup", options = [ST0, ST1, ST2])
+string ow_markerUpDivModeInput = input.string(SV0, "", group = ow_grp4, inline = "owmkup", options = [SV0, SV1, SV2])
+color ow_markerUpColorInput = input.color(OW_ORANGE_BR, "", group = ow_grp4, inline = "owmkup")
+string ow_markerDnOscModeInput = input.string(ST0, "Down marker oscillator state", group = ow_grp4, inline = "owmkdn", options = [ST0, ST3, ST4])
+string ow_markerDnDivModeInput = input.string(SV0, "", group = ow_grp4, inline = "owmkdn", options = [SV0, SV3, SV4])
+color ow_markerDnColorInput = input.color(OW_ORANGE_BR, "", group = ow_grp4, inline = "owmkdn")
+bool ow_markerClosePolarityInput = input.bool(false, "Filter on close polarity", group = ow_grp4)
+bool ow_markerRisingVolInput = input.bool(false, "Filter on rising volume", group = ow_grp4)
+bool ow_markerDivInput = input.bool(false, "Filter on divergence in last n bars", group = ow_grp4, inline = "owmdiv")
+int ow_markerDivBarsInput = input.int(5, "", group = ow_grp4, inline = "owmdiv", minval = 1)
+bool ow_markerOscInput = input.bool(false, "Filter on bull/bear oscillator", group = ow_grp4, inline = "owmosc")
+string ow_markerOscTypeInput = input.string(OS01, "", group = ow_grp4, inline = "owmosc", options = [OS21, OS03, OS04, OS20, OS22, OS24, OS90, OS25, OS27, OS28, OS13, OS02, OS09, OS54, OS16, OS55, OS01, OS14, OS17, OS05, OS06, OS23, OS52, OS10, OS12, OS19, OS15, OS18, OS11])
+string ow_markerOscSourceInput = input.string("close", "", group = ow_grp4, inline = "owmosc", options = ["open", "high", "low", "close", "hl2", "hlc3", "ohlc4", "hlcc4", "volume"])
+int ow_markerOscLengthInput = input.int(20, "", group = ow_grp4, inline = "owmosc", minval = 2)
+
+string smc_grp1 = "SMC Structure"
+int smc_len = input.int(5, "Swing Length", minval = 2, group = smc_grp1)
+int smc_window = input.int(5000, "Window", minval = 500, group = smc_grp1)
+bool smc_showSwing = input.bool(true, "Show Swing Labels", group = smc_grp1)
+bool smc_showMapping = input.bool(false, "Mapping Structure", group = smc_grp1)
+string smc_mappingStyle = input.string("----", "Mapping Style", options = ["⎯⎯⎯⎯", "----"], group = smc_grp1)
+bool smc_colorCandles = input.bool(false, "Color Candles", group = smc_grp1)
+bool smc_buildSweep = input.bool(true, "Build Sweeps", group = smc_grp1)
+string smc_textSize = input.string("Tiny", "Text Size", options = ["Tiny", "Small", "Normal", "Large", "Huge"], group = smc_grp1)
+color smc_swingUpColor = input.color(#089981, "Bull Structure", group = smc_grp1, inline = "smccol")
+color smc_swingDnColor = input.color(#f23645, "Bear Structure", group = smc_grp1, inline = "smccol")
+color smc_mappingColor = input.color(color.silver, "Mapping", group = smc_grp1)
+
+string smc_grp2 = "SMC Order Blocks"
+bool smc_showOB = input.bool(true, "Show Order Blocks", group = smc_grp2)
+int smc_obLast = input.int(5, "Show Last", minval = 1, maxval = 20, group = smc_grp2)
+int smc_obLookback = input.int(15, "Break Candle Search", minval = 3, maxval = 40, group = smc_grp2)
+string smc_obMode = input.string("Length", "Construction", options = ["Length", "Full"], group = smc_grp2)
+string smc_obMiti = input.string("Close", "Mitigation", options = ["Close", "Wick", "Avg"], group = smc_grp2)
+bool smc_showMetric = input.bool(true, "Show Metrics", group = smc_grp2)
+bool smc_showMidLine = input.bool(true, "Show Mid-Line", group = smc_grp2)
+color smc_obBullColor = input.color(color.new(#089981, 85), "Bull OB", group = smc_grp2, inline = "smcob")
+color smc_obBearColor = input.color(color.new(#f23645, 85), "Bear OB", group = smc_grp2, inline = "smcob")
+color smc_bbBullColor = input.color(color.new(#089981, 100), "Bull Breaker", group = smc_grp2, inline = "smcbb")
+color smc_bbBearColor = input.color(color.new(#f23645, 100), "Bear Breaker", group = smc_grp2, inline = "smcbb")
+
+string smc_grp3 = "SMC Fair Value Gaps and Equality"
+bool smc_fvgEnable = input.bool(false, "Show FVG", group = smc_grp3)
+int smc_fvgLast = input.int(5, "Show Last FVG", minval = 1, maxval = 20, group = smc_grp3)
+string smc_fvgWhat = input.string("FVG", "Mode", options = ["FVG", "Breakers"], group = smc_grp3)
+string smc_fvgMitigation = input.string("Close", "Mitigation", options = ["Close", "Wick", "Avg"], group = smc_grp3)
+float smc_fvgThresh = input.float(0.0, "Threshold ATR", minval = 0, step = 0.1, group = smc_grp3)
+bool smc_fvgLine = input.bool(true, "Show Mid-Line", group = smc_grp3)
+bool smc_fvgExtend = input.bool(false, "Extend FVG", group = smc_grp3)
+bool smc_showEQ = input.bool(true, "Show Equal Highs/Lows", group = smc_grp3)
+float smc_eqToleranceAtr = input.float(0.15, "Equal High/Low ATR Tolerance", minval = 0.01, step = 0.01, group = smc_grp3)
+color smc_fvgUpColor = input.color(color.new(#089981, 80), "Bull FVG", group = smc_grp3, inline = "smcfvg")
+color smc_fvgDnColor = input.color(color.new(#f23645, 80), "Bear FVG", group = smc_grp3, inline = "smcfvg")
+
+string srob_grp = "SROB TMF"
+string srob_displayType = input.string("Boxes", "Display Type", options = ["Boxes", "Lines"], group = srob_grp, inline = "srobdisp")
+bool srob_showOB = input.bool(false, "Show Order Block", group = srob_grp, inline = "srobdisp")
+bool srob_showSR = input.bool(true, "Show S/R", group = srob_grp, inline = "srobsr")
+bool srob_hshow = input.bool(false, "Show Historical S/R", group = srob_grp, inline = "srobsr")
+int srob_highlow = input.int(5, "Detection", minval = 4, maxval = 50, group = srob_grp, inline = "srobdet")
+int srob_maxsr = input.int(10, "Max Active", minval = 4, maxval = 50, group = srob_grp, inline = "srobdet")
+int srob_srLineWidth = input.int(2, "S/R Line Width", minval = 1, maxval = 5, group = srob_grp)
+int srob_obLineWidth = input.int(2, "OB Line Width", minval = 1, maxval = 5, group = srob_grp)
+bool srob_showInfoLabel = input.bool(true, "Show Info Table", group = srob_grp)
+color srob_obbscolor = input.color(#194afdc8, "Bull OB Border", group = srob_grp, inline = "srobob1")
+color srob_obbrcolor = input.color(#ec9812ca, "Bear OB Border", group = srob_grp, inline = "srobob1")
+color srob_obscolor = input.color(#1c3ff03c, "Bull OB Fill", group = srob_grp, inline = "srobob2")
+color srob_obrcolor = input.color(#ff52521f, "Bear OB Fill", group = srob_grp, inline = "srobob2")
+color srob_scolor = input.color(#4caf4f60, "Support", group = srob_grp, inline = "srobsrc")
+color srob_rcolor = input.color(#e1212194, "Resistance", group = srob_grp, inline = "srobsrc")
+color srob_bscolor = input.color(#4caf4f51, "Broken Support", group = srob_grp, inline = "srobsrc")
+color srob_brcolor = input.color(#ff52524d, "Broken Resistance", group = srob_grp, inline = "srobsrc")
+
+string obs_grp = "OBS Nephew_Sam"
+bool obs_showFractals = input.bool(false, "Show Fractal Points", group = obs_grp)
+string obs_filterFractal = input.string("3", "Fractal Filter", options = ["3", "5"], group = obs_grp)
+string obs_findObType = input.string("Close", "Find OB after fractal break", options = ["Close", "HL"], group = obs_grp)
+bool obs_filterFvgs = input.bool(true, "Filter only OB that follow with FVG", group = obs_grp)
+int obs_fvgDistance = input.int(3, "Max bars between OB and FVG", minval = 1, maxval = 6, group = obs_grp)
+string obs_lineHeight = input.string("Body", "Line Height", options = ["Body", "Wick"], group = obs_grp)
+bool obs_delLines = input.bool(true, "Delete lines after fill", group = obs_grp)
+string obs_linesStyle = input.string("Solid", "Line Style", options = ["Solid", "Dashed", "Dotted"], group = obs_grp)
+int obs_lineLength = input.int(5, "Length of lines", minval = 1, maxval = 100, group = obs_grp)
+int obs_linesWidth = input.int(2, "Lines Width", minval = 1, maxval = 4, group = obs_grp)
+color obs_bearLineColor = input.color(color.red, "Bear OB Line", group = obs_grp, inline = "obsline")
+color obs_bullLineColor = input.color(color.blue, "Bull OB Line", group = obs_grp, inline = "obsline")
+
+string twz_grp = "Tweezer Bottom"
+string twz_trendRule1 = "SMA50"
+string twz_trendRule2 = "SMA50, SMA200"
+string twz_trendRule = input.string(twz_trendRule1, "Detect Trend Based On", options = [twz_trendRule1, twz_trendRule2, "No detection"], group = twz_grp)
+color twz_labelBullish = input.color(color.blue, "Label Color Bullish", group = twz_grp)
+bool twz_showBackground = input.bool(true, "Show Background", group = twz_grp)
+
+string st_calcGroup = "SuperTrend Calculation"
+int st_length = input.int(22, "ATR Period", group = st_calcGroup)
+float st_mult = input.float(3.0, "ATR Multiplier", step = 0.1, group = st_calcGroup)
+float st_src = input.source(hl2, "Source", group = st_calcGroup)
+bool st_wicks = input.bool(true, "Take Wicks into Account", group = st_calcGroup)
+string st_visualGroup = "SuperTrend Visuals"
+bool st_showLabels = input.bool(true, "Show Buy/Sell Labels", group = st_visualGroup)
+bool st_highlightState = input.bool(true, "Highlight State", group = st_visualGroup)
+
+string rsi_grp1 = "RSI Settings"
+int rsi_rsiLengthInput = input.int(14, minval = 1, title = "RSI Length", group = rsi_grp1)
+float rsi_rsiSourceInput = input.source(close, "Source", group = rsi_grp1)
+bool rsi_calculateDivergence = input.bool(false, "Calculate Divergence", group = rsi_grp1)
+string rsi_grp2 = "RSI Smoothing"
+string rsi_maTypeInput = input.string("VWMA", "Type", options = ["None", "SMA", "SMA + Bollinger Bands", "EMA", "SMMA (RMA)", "WMA", "VWMA"], group = rsi_grp2)
+int rsi_maLengthInput = input.int(14, "Length", group = rsi_grp2, minval = 1)
+float rsi_bbMultInput = input.float(2.0, "BB StdDev", minval = 0.001, maxval = 50, step = 0.5, group = rsi_grp2)
+string rsi_grp3 = "RSI Overlay"
+bool rsi_showCrossColour = input.bool(true, "Colour candle on RSI/MA cross", group = rsi_grp3)
+color rsi_crossBullColour = input.color(color.new(color.lime, 0), "Bullish cross colour", group = rsi_grp3)
+color rsi_crossBearColour = input.color(color.new(color.red, 0), "Bearish cross colour", group = rsi_grp3)
+int rsi_overlayLookback = input.int(150, "Overlay Anchor Lookback", minval = 20, group = rsi_grp3)
+float rsi_overlayAtrMult = input.float(4.0, "Overlay ATR Offset", minval = 0.5, step = 0.25, group = rsi_grp3)
+float rsi_overlayScaleAtr = input.float(2.0, "Overlay Scale ATR", minval = 0.25, step = 0.25, group = rsi_grp3)
+
+string macd_grp = "MACD"
+float macd_source = input.source(close, "Source", group = macd_grp)
+int macd_fastlen = input.int(12, "Fast Length", group = macd_grp)
+int macd_slowlen = input.int(26, "Slow Length", group = macd_grp)
+int macd_siglen = input.int(9, "Signal Length", group = macd_grp)
+int macd_overlayLookback = input.int(150, "Overlay Anchor Lookback", minval = 20, group = macd_grp)
+float macd_overlayAtrMult = input.float(6.0, "Overlay ATR Offset", minval = 0.5, step = 0.25, group = macd_grp)
+float macd_overlayScaleAtr = input.float(1.5, "Histogram Scale ATR", minval = 0.25, step = 0.25, group = macd_grp)
+
+string atrr_grp = "ATR Ratio"
+int atrr_length = input.int(50, "ATR Length", group = atrr_grp)
+float atrr_multiplier = input.float(1.5, "Multiplier", minval = 1, step = 0.1, group = atrr_grp)
+int atrr_lookBack = input.int(50, "Lookback", group = atrr_grp)
+bool atrr_showZones = input.bool(false, "Show Bullish/Bearish Zones", group = atrr_grp)
+int atrr_factor = input.int(1, "SuperTrend Factor", minval = 1, maxval = 100, group = atrr_grp)
+int atrr_pd = input.int(1, "SuperTrend ATR Period", minval = 1, maxval = 100, group = atrr_grp)
+bool atrr_isTPl = input.bool(true, "Take Profit Long", group = atrr_grp)
+bool atrr_isTPs = input.bool(true, "Take Profit Short", group = atrr_grp)
+float atrr_tp = input.float(5, "Take Profit %", group = atrr_grp)
+int atrr_overlayLookback = input.int(150, "Overlay Anchor Lookback", minval = 20, group = atrr_grp)
+float atrr_overlayAtrMult = input.float(8.0, "Overlay ATR Offset", minval = 0.5, step = 0.25, group = atrr_grp)
+float atrr_overlayScaleAtr = input.float(2.0, "Ratio Scale ATR", minval = 0.25, step = 0.25, group = atrr_grp)
+
+string ema_grpEma = "EMA Lengths"
+int ema_len9 = input.int(9, "EMA 9", minval = 1, group = ema_grpEma)
+int ema_len21 = input.int(21, "EMA 21", minval = 1, group = ema_grpEma)
+int ema_len50 = input.int(50, "EMA 50", minval = 1, group = ema_grpEma)
+int ema_len200 = input.int(200, "EMA 200", minval = 1, group = ema_grpEma)
+string ema_grpSetup = "EMA Setup"
+bool ema_useATRProximity = input.bool(true, "Proximity by ATR", group = ema_grpSetup)
+int ema_atrLen = input.int(14, "ATR Length", minval = 1, group = ema_grpSetup)
+float ema_atrMult = input.float(0.30, "Distance to EMA21 (ATR x)", step = 0.05, group = ema_grpSetup)
+float ema_pctProximity = input.float(0.25, "Distance to EMA21 (%)", step = 0.05, group = ema_grpSetup)
+int ema_volLen = input.int(20, "Vol SMA Length", minval = 1, group = ema_grpSetup)
+float ema_volDryFactor = input.float(0.80, "Volume Dries Up if Vol < SMA *", step = 0.05, group = ema_grpSetup)
+string ema_grpSignals = "EMA Signals"
+string ema_bullishMode = input.string("Close>Open", "Bullish Candle Confirmation", options = ["Close>Open", "Close>HighPrev"], group = ema_grpSignals)
+bool ema_showLabels = input.bool(true, "Show Labels", group = ema_grpSignals)
+bool ema_showBg = input.bool(true, "Show Regime Background", group = ema_grpSignals)
+bool ema_showStatus = input.bool(true, "Show Status Table", group = ema_grpSignals)
+
+string tlb_grp = "Trendlines with Breaks"
+int tlb_length = input.int(14, "Swing Detection Lookback", group = tlb_grp)
+float tlb_mult = input.float(1.0, "Slope", minval = 0, step = 0.1, group = tlb_grp)
+string tlb_calcMethod = input.string("Atr", "Slope Calculation Method", options = ["Atr", "Stdev", "Linreg"], group = tlb_grp)
+bool tlb_backpaint = input.bool(true, "Backpaint", group = tlb_grp)
+color tlb_upCss = input.color(color.teal, "Up Trendline Color", group = tlb_grp, inline = "tlbc")
+color tlb_dnCss = input.color(color.red, "Down Trendline Color", group = tlb_grp, inline = "tlbc")
+bool tlb_showExt = input.bool(true, "Show Extended Lines", group = tlb_grp)
+
+string vt_grp = "Volumatic Trend"
+int vt_length = input.int(40, "Length", group = vt_grp)
+bool vt_vol_h = input.bool(true, "Volume Histogram", group = vt_grp)
+color vt_color_up = input.color(#247ac0, "Up Trend", group = vt_grp, inline = "vtc")
+color vt_color_dn = input.color(#c88829, "Down Trend", group = vt_grp, inline = "vtc")
+
+float atr14 = ta.atr(14)
+float low_anchor_150 = ta.lowest(low, 150)
+
+float ow_osc1Center = oscCenter(ow_osc1TypeInput)
+float ow_osc2Center = oscCenter(ow_osc2TypeInput)
+float ow_oscXCenter = ow_oscXCenterInput
+if show_OscillatorWorkbench
+    ow_checkForNoVolume(ow_osc1TypeInput)
+    ow_checkForNoVolume(ow_osc2TypeInput)
+float ow_osc1 = show_OscillatorWorkbench ? ow_oscCalc(ow_osc1TypeInput, LucfTa.sourceStrToFloat(ow_osc1SourceInput), ow_osc1LengthInput) : na
+float ow_osc2 = show_OscillatorWorkbench ? ow_oscCalc(ow_osc2TypeInput, LucfTa.sourceStrToFloat(ow_osc2SourceInput), ow_osc2LengthInput) : na
+float ow_oscX = show_OscillatorWorkbench and ow_oscXInput ? ow_oscXSourceInput : na
+int ow_qtyOfOscillators = (not na(ow_osc1) ? 1 : 0) + (not na(ow_osc2) ? 1 : 0) + (not na(ow_oscX) ? 1 : 0)
+float ow_weight1 = show_OscillatorWorkbench ? ow_oscWeight(ow_osc1, ow_osc1Center) : na
+float ow_weight2 = show_OscillatorWorkbench ? ow_oscWeight(ow_osc2, ow_osc2Center) : na
+float ow_weightX = show_OscillatorWorkbench ? ow_oscWeight(ow_oscX, ow_oscXCenter) : na
+float ow_weight = show_OscillatorWorkbench and ow_qtyOfOscillators > 0 ? (nz(ow_weight1) + nz(ow_weight2) + nz(ow_weightX)) / ow_qtyOfOscillators : na
+float ow_relVolPctRank = ta.percentrank(volume, ow_relVolLookbackInput) / 100.
+float ow_relVolumeWeight = show_OscillatorWorkbench ? (ow_useRelVolWeightInput and not na(volume) ? ow_relVolPctRank : 1.) : na
+float ow_combinedWeight = show_OscillatorWorkbench ? ow_weight * ow_relVolumeWeight : na
+float ow_refSource = LucfTa.sourceStrToFloat(ow_refSourceInput)
+float ow_capUnits = ow_oscChannelCapModeInput == CAP1 ? ta.stdev(ow_refSource, ow_refLengthInput) : ta.atr(20)
+float ow_weightedSource = show_OscillatorWorkbench ? ow_refSource + (math.sign(ow_combinedWeight) * math.min(ow_refSource * math.abs(ow_combinedWeight), ow_capUnits * ow_oscChannelCapInput)) : na
+float ow_reference = show_OscillatorWorkbench ? LucfTa.ma(ow_refTypeInput, ow_refSource, ow_refLengthInput) : na
+float ow_weightedRef = show_OscillatorWorkbench ? LucfTa.ma(ow_refTypeInput, ow_weightedSource, ow_refLengthInput) : na
+bool ow_oscChannelBull = show_OscillatorWorkbench and ow_weightedRef > ow_reference
+bool ow_oscChannelBear = show_OscillatorWorkbench and not ow_oscChannelBull
+bool ow_oscChannelBullStrong = show_OscillatorWorkbench and ow_oscChannelBull and close > ow_reference and ta.rising(ow_reference, 1) and ta.rising(ow_weightedRef, 1)
+bool ow_oscChannelBearStrong = show_OscillatorWorkbench and ow_oscChannelBear and close < ow_reference and ta.falling(ow_reference, 1) and ta.falling(ow_weightedRef, 1)
+bool ow_divergence = show_OscillatorWorkbench and (ow_divDetectionModeInput == DIV1 ? math.sign(ta.change(ow_reference)) != math.sign(ta.change(ow_weightedRef)) : math.sign(ta.change(ow_combinedWeight)) != math.sign(ta.change(close)))
+float ow_divChannelHiSrc = ow_divChannelLevelsInput == CH1 ? high : math.max(open, close)
+float ow_divChannelLoSrc = ow_divChannelLevelsInput == CH1 ? low : math.min(open, close)
+float divBreachHiSrc =
+     ow_divChannelBreachesInput == BR1 ? low   :
+     ow_divChannelBreachesInput == BR2 ? high  :
+     ow_divChannelBreachesInput == BR3 ? close :
+     ow_divChannelBreachesInput == BR4 ? open  :
+     ow_divChannelBreachesInput == BR5 ? hl2   :
+     ow_divChannelBreachesInput == BR6 ? hlc3  :
+     ow_divChannelBreachesInput == BR7 ? hlcc4 :
+     ohlc4
+float divBreachLoSrc =
+     ow_divChannelBreachesInput == BR1 ? high  :
+     ow_divChannelBreachesInput == BR2 ? low   :
+     ow_divChannelBreachesInput == BR3 ? close :
+     ow_divChannelBreachesInput == BR4 ? open  :
+     ow_divChannelBreachesInput == BR5 ? hl2   :
+     ow_divChannelBreachesInput == BR6 ? hlc3  :
+     ow_divChannelBreachesInput == BR7 ? hlcc4 :
+     ohlc4
+float ow_divChannelHi = na
+float ow_divChannelLo = na
+bool ow_divChannelBull = false
+bool ow_divChannelBear = false
+bool ow_divChannelBreached = false
+bool ow_newDivChannel = false
+float ow_preBreachUpChanges = 0
+float ow_preBreachDnChanges = 0
+if show_OscillatorWorkbench
+    [ow_divChannelHi, ow_divChannelLo, ow_divChannelBull, ow_divChannelBear, ow_divChannelBreached, ow_newDivChannel, ow_preBreachUpChanges, ow_preBreachDnChanges] = LucfTa.divergenceChannel(ow_divergence, ow_divChannelHiSrc, ow_divChannelLoSrc, divBreachHiSrc, divBreachLoSrc)
+bool ow_preBreachBiasBull = show_OscillatorWorkbench and not ow_divChannelBreached and ow_divChannelBiasInput and ow_preBreachUpChanges > ow_preBreachDnChanges
+bool ow_preBreachBiasBear = show_OscillatorWorkbench and not ow_divChannelBreached and ow_divChannelBiasInput and ow_preBreachUpChanges < ow_preBreachDnChanges
+bool ow_divChannelBullStrong = show_OscillatorWorkbench and ow_divChannelBull and ow_oscChannelBullStrong
+bool ow_divChannelBearStrong = show_OscillatorWorkbench and ow_divChannelBear and ow_oscChannelBearStrong
+bool ow_closeToCloseUp = ta.change(close) > 0
+bool ow_closeToCloseDn = ta.change(close) < 0
+float ow_markerOscCenter = oscCenter(ow_markerOscTypeInput)
+float ow_markerOsc = show_OscillatorWorkbench ? ow_oscCalc(ow_markerOscTypeInput, LucfTa.sourceStrToFloat(ow_markerOscSourceInput), ow_markerOscLengthInput) : na
+bool ow_oscBull = show_OscillatorWorkbench and ow_markerOsc > ow_markerOscCenter
+bool ow_oscBear = show_OscillatorWorkbench and ow_markerOsc < ow_markerOscCenter
+bool ow_risingVolume = ta.change(volume) > 0
+bool ow_divPresent = ta.barssince(ow_divergence) <= ow_markerDivBarsInput
+bool ow_upMarkerOscCondition = ow_markerUpOscModeInput == ST1 ? ow_transitionTo(ow_oscChannelBullStrong) : ow_markerUpOscModeInput == ST2 ? ow_transitionTo(ow_oscChannelBull) or ow_transitionTo(ow_oscChannelBullStrong) : false
+bool ow_upMarkerDivCondition = ow_markerUpDivModeInput == SV1 ? ow_transitionTo(ow_divChannelBullStrong) : ow_markerUpDivModeInput == SV2 ? ow_transitionTo(ow_divChannelBull) or ow_transitionTo(ow_divChannelBullStrong) : false
+bool ow_dnMarkerOscCondition = ow_markerDnOscModeInput == ST3 ? ow_transitionTo(ow_oscChannelBearStrong) : ow_markerDnOscModeInput == ST4 ? ow_transitionTo(ow_oscChannelBear) or ow_transitionTo(ow_oscChannelBearStrong) : false
+bool ow_dnMarkerDivCondition = ow_markerDnDivModeInput == SV3 ? ow_transitionTo(ow_divChannelBearStrong) : ow_markerDnDivModeInput == SV4 ? ow_transitionTo(ow_divChannelBear) or ow_transitionTo(ow_divChannelBearStrong) : false
+bool ow_upMarker = show_OscillatorWorkbench and (ow_markerUpOscModeInput != ST0 or ow_markerUpDivModeInput != SV0) and (ow_upMarkerOscCondition or ow_upMarkerDivCondition) and barstate.isconfirmed and (not ow_markerClosePolarityInput or ow_closeToCloseUp) and (not ow_markerOscInput or ow_oscBull) and (not ow_markerRisingVolInput or ow_risingVolume) and (not ow_markerDivInput or ow_divPresent)
+bool ow_dnMarker = show_OscillatorWorkbench and (ow_markerDnOscModeInput != ST0 or ow_markerDnDivModeInput != SV0) and (ow_dnMarkerOscCondition or ow_dnMarkerDivCondition) and barstate.isconfirmed and (not ow_markerClosePolarityInput or ow_closeToCloseDn) and (not ow_markerOscInput or ow_oscBear) and (not ow_markerRisingVolInput or ow_risingVolume) and (not ow_markerDivInput or ow_divPresent)
+color refLineColor =
+     ow_oscChannelBullStrong ? ow_refLineUpUpColorInput :
+     ow_oscChannelBearStrong ? ow_refLineDnDnColorInput :
+     ow_oscChannelBull       ? ow_refLineUpColorInput   :
+     ow_refLineDnColorInput
+color oscLineColor =
+     ow_oscChannelBullStrong ? ow_oscLineUpUpColorInput :
+     ow_oscChannelBearStrong ? ow_oscLineDnDnColorInput :
+     ow_oscChannelBull       ? ow_oscLineUpColorInput   :
+     ow_oscLineDnColorInput
+color oscChannelColor =
+     ow_oscChannelBullStrong ? ow_oscChannelUpUpColorInput :
+     ow_oscChannelBearStrong ? ow_oscChannelDnDnColorInput :
+     ow_oscChannelBull       ? ow_oscChannelUpColorInput   :
+     ow_oscChannelDnColorInput
+color ow_divLinesColor = ow_divChannelBreached ? ow_divChannelBullStrong ? ow_divLinesUpUpColorInput : ow_divChannelBearStrong ? ow_divLinesDnDnColorInput : ow_divChannelBull ? ow_divLinesUpColorInput : ow_divChannelBear ? ow_divLinesDnColorInput : ow_divLinesNtColorInput : ow_divChannelBiasInput and ow_preBreachBiasBull ? ow_divLinesUpColorInput : ow_divChannelBiasInput and ow_preBreachBiasBear ? ow_divLinesDnColorInput : ow_divLinesNtColorInput
+color ow_divChannelColor = ow_divChannelBreached ? ow_divChannelBullStrong ? ow_divChannelUpUpColorInput : ow_divChannelBearStrong ? ow_divChannelDnDnColorInput : ow_divChannelBull ? ow_divChannelUpColorInput : ow_divChannelBear ? ow_divChannelDnColorInput : ow_divChannelNtColorInput : ow_divChannelBiasInput and ow_preBreachBiasBull ? ow_divChannelUpColorInput : ow_divChannelBiasInput and ow_preBreachBiasBear ? ow_divChannelDnColorInput : ow_divChannelNtColorInput
+float ow_divChannelMid = math.avg(ow_divChannelHi, ow_divChannelLo)
+color ow_barColor = show_OscillatorWorkbench and ow_barColorsShowInput ? ow_colorBarModeInput == CB1 ? ow_divergence ? ow_barsDivColorInput : na : ow_colorBarModeInput == CB2 ? ow_divergence ? ow_barsDivColorInput : ow_oscChannelBullStrong ? ow_barsUpUpColorInput : ow_oscChannelBearStrong ? ow_barsDnDnColorInput : ow_oscChannelBull ? ow_barsUpColorInput : ow_oscChannelBear ? ow_barsDnColorInput : ow_barsNtColorInput : ow_colorBarModeInput == CB3 ? ow_divergence ? ow_barsDivColorInput : ow_divChannelBullStrong ? ow_barsUpUpColorInput : ow_divChannelBearStrong ? ow_barsDnDnColorInput : ow_divChannelBull ? ow_barsUpColorInput : ow_divChannelBear ? ow_barsDnColorInput : ow_barsNtColorInput : ow_divergence ? ow_barsDivColorInput : ow_oscChannelBullStrong and ow_divChannelBullStrong ? ow_barsUpUpColorInput : ow_oscChannelBearStrong and ow_divChannelBearStrong ? ow_barsDnDnColorInput : (ow_oscChannelBull or ow_oscChannelBullStrong) and (ow_divChannelBull or ow_divChannelBullStrong) ? ow_barsUpColorInput : (ow_oscChannelBear or ow_oscChannelBearStrong) and (ow_divChannelBear or ow_divChannelBearStrong) ? ow_barsDnColorInput : ow_barsNtColorInput : na
+ow_barColor := show_OscillatorWorkbench and ow_barsEmptyOnDecVolInput and ta.falling(volume, 1) and not ow_divergence ? na : ow_barColor
+
+plot(show_OscillatorWorkbench ? ow_refSource : na, "OW Reference Source", display = display.data_window, color = refLineColor)
+plot(show_OscillatorWorkbench ? ow_weightedSource : na, "OW Weighted Source", display = display.data_window, color = oscLineColor)
+plot(show_OscillatorWorkbench ? ow_osc1 : na, "OW Oscillator 1", display = display.data_window)
+plot(show_OscillatorWorkbench ? ow_osc2 : na, "OW Oscillator 2", display = display.data_window)
+plot(show_OscillatorWorkbench ? ow_oscX : na, "OW Oscillator X", display = display.data_window)
+plot(show_OscillatorWorkbench ? ow_combinedWeight : na, "OW Combined Weight", display = display.data_window)
+ow_weightedPlot = plot(show_OscillatorWorkbench and (ow_reflLineShowInput or ow_osclLineShowInput or ow_oscChannelShowInput) ? ow_weightedRef : na, "OW Weighted Reference", ow_osclLineShowInput ? oscLineColor : na, ow_oscLineWidthInput, lineStyleFromUserInput(ow_oscLineStyleInput))
+ow_refPlot = plot(show_OscillatorWorkbench and (ow_reflLineShowInput or ow_osclLineShowInput or ow_oscChannelShowInput) and not na(ow_combinedWeight) ? ow_reference : na, "OW Reference", ow_reflLineShowInput ? refLineColor : na, ow_refLineWidthInput, lineStyleFromUserInput(ow_refLineStyleInput))
+fill(ow_weightedPlot, ow_refPlot, ow_reference, ow_weightedRef, show_OscillatorWorkbench and ow_oscChannelShowInput ? oscChannelColor : na, show_OscillatorWorkbench and ow_oscChannelShowInput ? color.new(oscChannelColor, 90) : na, "OW Fill")
+ow_divHiPlot = plot(show_OscillatorWorkbench and (ow_divLinesShowInput or ow_divChannelShowInput) ? ow_divChannelHi : na, "OW Divergence Hi", not ow_newDivChannel and ow_divLinesShowInput ? ow_divLinesColor : na, ow_divLinesWidthInput, lineStyleFromUserInput(ow_divLinesStyleInput))
+ow_divLoPlot = plot(show_OscillatorWorkbench and (ow_divLinesShowInput or ow_divChannelShowInput) ? ow_divChannelLo : na, "OW Divergence Lo", not ow_newDivChannel and ow_divLinesShowInput ? ow_divLinesColor : na, ow_divLinesWidthInput, lineStyleFromUserInput(ow_divLinesStyleInput))
+ow_divMidPlot = plot(show_OscillatorWorkbench and (ow_divLinesShowInput or ow_divChannelShowInput) ? ow_divChannelMid : na, "OW Divergence Mid", na, display = display.none)
+fill(ow_divHiPlot, ow_divMidPlot, ow_divChannelHi, ow_divChannelMid, show_OscillatorWorkbench and not ow_newDivChannel and ow_divChannelShowInput ? ow_divChannelColor : na, show_OscillatorWorkbench and not ow_newDivChannel and ow_divChannelShowInput ? color.new(ow_divChannelColor, 99) : na)
+fill(ow_divMidPlot, ow_divLoPlot, ow_divChannelMid, ow_divChannelLo, show_OscillatorWorkbench and not ow_newDivChannel and ow_divChannelShowInput ? color.new(ow_divChannelColor, 99) : na, show_OscillatorWorkbench and not ow_newDivChannel and ow_divChannelShowInput ? ow_divChannelColor : na)
+plotchar(show_OscillatorWorkbench and ow_upMarker, "OW Up Marker", "▲", location.belowbar, ow_markerUpColorInput, size = size.tiny)
+plotchar(show_OscillatorWorkbench and ow_dnMarker, "OW Down Marker", "▼", location.abovebar, ow_markerDnColorInput, size = size.tiny)
+plotchar(show_OscillatorWorkbench and ow_charDivShowInput and ow_divergence, "OW Divergence Char", ow_charDivInput, ow_charDivAboveInput ? location.abovebar : location.belowbar, ow_charDivColorInput, size = size.tiny)
+alertcondition(show_OscillatorWorkbench and ow_upMarker, "OW Up Marker", "Oscillator Workbench up marker")
+alertcondition(show_OscillatorWorkbench and ow_dnMarker, "OW Down Marker", "Oscillator Workbench down marker")
+
+var line[] smc_structureLines = array.new_line()
+var label[] smc_structureLabels = array.new_label()
+var line[] smc_mappingLines = array.new_line()
+var box[] smc_bullObBoxes = array.new_box()
+var box[] smc_bearObBoxes = array.new_box()
+var line[] smc_bullObMidLines = array.new_line()
+var line[] smc_bearObMidLines = array.new_line()
+var label[] smc_obLabels = array.new_label()
+var box[] smc_bullFvgBoxes = array.new_box()
+var box[] smc_bearFvgBoxes = array.new_box()
+var line[] smc_bullFvgMidLines = array.new_line()
+var line[] smc_bearFvgMidLines = array.new_line()
+var label[] smc_eqLabels = array.new_label()
+var line[] smc_eqLines = array.new_line()
+var int smc_lastSwingType = 0
+var float smc_lastSwingPrice = na
+var int smc_lastSwingBar = na
+var float smc_lastHigh = na
+var int smc_lastHighBar = na
+var float smc_prevHigh = na
+var int smc_prevHighBar = na
+var float smc_lastLow = na
+var int smc_lastLowBar = na
+var float smc_prevLow = na
+var int smc_prevLowBar = na
+var bool smc_highBroken = false
+var bool smc_lowBroken = false
+var int smc_trend = 0
+bool smc_bullBreak = false
+bool smc_bearBreak = false
+bool smc_bullChoch = false
+bool smc_bearChoch = false
+bool smc_bullFvgSignal = false
+bool smc_bearFvgSignal = false
+bool smc_bullObSignal = false
+bool smc_bearObSignal = false
+color smc_barColor = na
+
+if not show_SmartMoneyConcept
+    smc_delete_lines(smc_structureLines)
+    smc_delete_labels(smc_structureLabels)
+    smc_delete_lines(smc_mappingLines)
+    smc_delete_boxes(smc_bullObBoxes)
+    smc_delete_boxes(smc_bearObBoxes)
+    smc_delete_lines(smc_bullObMidLines)
+    smc_delete_lines(smc_bearObMidLines)
+    smc_delete_labels(smc_obLabels)
+    smc_delete_boxes(smc_bullFvgBoxes)
+    smc_delete_boxes(smc_bearFvgBoxes)
+    smc_delete_lines(smc_bullFvgMidLines)
+    smc_delete_lines(smc_bearFvgMidLines)
+    smc_delete_labels(smc_eqLabels)
+    smc_delete_lines(smc_eqLines)
+else
+    float smc_swingHigh = ta.pivothigh(high, smc_len, smc_len)
+    float smc_swingLow = ta.pivotlow(low, smc_len, smc_len)
+    float smc_eqTol = atr14 * smc_eqToleranceAtr
+    if not na(smc_swingHigh) and bar_index > smc_window
+        smc_prevHigh := smc_lastHigh
+        smc_prevHighBar := smc_lastHighBar
+        smc_lastHigh := smc_swingHigh
+        smc_lastHighBar := bar_index - smc_len
+        smc_highBroken := false
+        if smc_showSwing
+            label smc_lblh = label.new(smc_lastHighBar, smc_lastHigh, "SH", style = label.style_label_down, color = color.new(smc_swingDnColor, 85), textcolor = smc_swingDnColor, size = smc_textSize.txSz())
+            array.push(smc_structureLabels, smc_lblh)
+        if smc_showEQ and not na(smc_prevHigh) and math.abs(smc_lastHigh - smc_prevHigh) <= smc_eqTol
+            line smc_eqh = line.new(smc_prevHighBar, smc_prevHigh, smc_lastHighBar, smc_lastHigh, color = smc_mappingColor, style = line.style_dotted)
+            label smc_eqlh = label.new(smc_lastHighBar, smc_lastHigh, "EQH", style = label.style_label_down, color = color.new(smc_mappingColor, 85), textcolor = smc_mappingColor, size = smc_textSize.txSz())
+            array.push(smc_eqLines, smc_eqh)
+            array.push(smc_eqLabels, smc_eqlh)
+        if smc_showMapping and smc_lastSwingType != 1 and not na(smc_lastSwingPrice)
+            line smc_mapH = line.new(smc_lastSwingBar, smc_lastSwingPrice, smc_lastHighBar, smc_lastHigh, color = smc_mappingColor, style = smc_mappingStyle.lstyle())
+            array.push(smc_mappingLines, smc_mapH)
+        smc_lastSwingType := 1
+        smc_lastSwingPrice := smc_lastHigh
+        smc_lastSwingBar := smc_lastHighBar
+    if not na(smc_swingLow) and bar_index > smc_window
+        smc_prevLow := smc_lastLow
+        smc_prevLowBar := smc_lastLowBar
+        smc_lastLow := smc_swingLow
+        smc_lastLowBar := bar_index - smc_len
+        smc_lowBroken := false
+        if smc_showSwing
+            label smc_lbll = label.new(smc_lastLowBar, smc_lastLow, "SL", style = label.style_label_up, color = color.new(smc_swingUpColor, 85), textcolor = smc_swingUpColor, size = smc_textSize.txSz())
+            array.push(smc_structureLabels, smc_lbll)
+        if smc_showEQ and not na(smc_prevLow) and math.abs(smc_lastLow - smc_prevLow) <= smc_eqTol
+            line smc_eql = line.new(smc_prevLowBar, smc_prevLow, smc_lastLowBar, smc_lastLow, color = smc_mappingColor, style = line.style_dotted)
+            label smc_eqll = label.new(smc_lastLowBar, smc_lastLow, "EQL", style = label.style_label_up, color = color.new(smc_mappingColor, 85), textcolor = smc_mappingColor, size = smc_textSize.txSz())
+            array.push(smc_eqLines, smc_eql)
+            array.push(smc_eqLabels, smc_eqll)
+        if smc_showMapping and smc_lastSwingType != -1 and not na(smc_lastSwingPrice)
+            line smc_mapL = line.new(smc_lastSwingBar, smc_lastSwingPrice, smc_lastLowBar, smc_lastLow, color = smc_mappingColor, style = smc_mappingStyle.lstyle())
+            array.push(smc_mappingLines, smc_mapL)
+        smc_lastSwingType := -1
+        smc_lastSwingPrice := smc_lastLow
+        smc_lastSwingBar := smc_lastLowBar
+    if not na(smc_lastHigh) and not smc_highBroken and close > smc_lastHigh
+        smc_bullBreak := true
+        smc_bullChoch := smc_trend < 0
+        smc_trend := 1
+        smc_highBroken := true
+        line smc_bosUp = line.new(smc_lastHighBar, smc_lastHigh, bar_index, smc_lastHigh, color = smc_swingUpColor)
+        label smc_bosUpLabel = label.new(bar_index, smc_lastHigh, smc_bullChoch ? "CHoCH" : "BOS", style = label.style_label_down, color = color.new(smc_swingUpColor, 0), textcolor = color.white, size = smc_textSize.txSz())
+        array.push(smc_structureLines, smc_bosUp)
+        array.push(smc_structureLabels, smc_bosUpLabel)
+    if not na(smc_lastLow) and not smc_lowBroken and close < smc_lastLow
+        smc_bearBreak := true
+        smc_bearChoch := smc_trend > 0
+        smc_trend := -1
+        smc_lowBroken := true
+        line smc_bosDn = line.new(smc_lastLowBar, smc_lastLow, bar_index, smc_lastLow, color = smc_swingDnColor)
+        label smc_bosDnLabel = label.new(bar_index, smc_lastLow, smc_bearChoch ? "CHoCH" : "BOS", style = label.style_label_up, color = color.new(smc_swingDnColor, 0), textcolor = color.white, size = smc_textSize.txSz())
+        array.push(smc_structureLines, smc_bosDn)
+        array.push(smc_structureLabels, smc_bosDnLabel)
+    if smc_buildSweep and not na(smc_lastHigh) and high > smc_lastHigh and close < smc_lastHigh
+        label smc_swuph = label.new(bar_index, high, "x", style = label.style_label_down, color = color.new(smc_swingDnColor, 70), textcolor = smc_swingDnColor, size = smc_textSize.txSz())
+        array.push(smc_structureLabels, smc_swuph)
+    if smc_buildSweep and not na(smc_lastLow) and low < smc_lastLow and close > smc_lastLow
+        label smc_swupl = label.new(bar_index, low, "x", style = label.style_label_up, color = color.new(smc_swingUpColor, 70), textcolor = smc_swingUpColor, size = smc_textSize.txSz())
+        array.push(smc_structureLabels, smc_swupl)
+    if smc_bullBreak and smc_showOB
+        int smc_bearIdx = na
+        for smc_i = 1 to smc_obLookback
+            if close[smc_i] < open[smc_i]
+                smc_bearIdx := smc_i
+                break
+        if not na(smc_bearIdx)
+            float smc_top = smc_obMode == "Full" ? high[smc_bearIdx] : math.max(open[smc_bearIdx], close[smc_bearIdx])
+            float smc_btm = low[smc_bearIdx]
+            box smc_bullOb = box.new(bar_index[smc_bearIdx], smc_top, bar_index, smc_btm, bgcolor = smc_obBullColor, border_color = color.new(color.lime, 0))
+            array.unshift(smc_bullObBoxes, smc_bullOb)
+            if smc_showMidLine
+                line smc_bullMid = line.new(bar_index[smc_bearIdx], math.avg(smc_top, smc_btm), bar_index, math.avg(smc_top, smc_btm), color = color.new(color.lime, 0))
+                array.unshift(smc_bullObMidLines, smc_bullMid)
+            if smc_showMetric
+                label smc_bullObLbl = label.new(bar_index[smc_bearIdx], math.avg(smc_top, smc_btm), "Buy Vol " + str.tostring(ta.sum(volume, smc_bearIdx + 1), format.volume), style = label.style_label_left, color = color.new(color.lime, 80), textcolor = color.lime, size = size.tiny)
+                array.unshift(smc_obLabels, smc_bullObLbl)
+            smc_bullObSignal := true
+    if smc_bearBreak and smc_showOB
+        int smc_bullIdx = na
+        for smc_i = 1 to smc_obLookback
+            if close[smc_i] > open[smc_i]
+                smc_bullIdx := smc_i
+                break
+        if not na(smc_bullIdx)
+            float smc_top = high[smc_bullIdx]
+            float smc_btm = smc_obMode == "Full" ? low[smc_bullIdx] : math.min(open[smc_bullIdx], close[smc_bullIdx])
+            box smc_bearOb = box.new(bar_index[smc_bullIdx], smc_top, bar_index, smc_btm, bgcolor = smc_obBearColor, border_color = color.new(color.red, 0))
+            array.unshift(smc_bearObBoxes, smc_bearOb)
+            if smc_showMidLine
+                line smc_bearMid = line.new(bar_index[smc_bullIdx], math.avg(smc_top, smc_btm), bar_index, math.avg(smc_top, smc_btm), color = color.new(color.red, 0))
+                array.unshift(smc_bearObMidLines, smc_bearMid)
+            if smc_showMetric
+                label smc_bearObLbl = label.new(bar_index[smc_bullIdx], math.avg(smc_top, smc_btm), "Sell Vol " + str.tostring(ta.sum(volume, smc_bullIdx + 1), format.volume), style = label.style_label_left, color = color.new(color.red, 80), textcolor = color.red, size = size.tiny)
+                array.unshift(smc_obLabels, smc_bearObLbl)
+            smc_bearObSignal := true
+    if smc_fvgEnable
+        bool smc_bullGap = low > high[2] and (low - high[2]) >= atr14 * smc_fvgThresh
+        bool smc_bearGap = high < low[2] and (low[2] - high) >= atr14 * smc_fvgThresh
+        if smc_bullGap
+            box smc_bfvg = box.new(bar_index - 2, low, smc_fvgExtend ? bar_index + 1 : bar_index, high[2], bgcolor = smc_fvgUpColor, border_color = color.new(color.lime, 0))
+            array.unshift(smc_bullFvgBoxes, smc_bfvg)
+            if smc_fvgLine
+                line smc_bfvgLine = line.new(bar_index - 2, math.avg(low, high[2]), smc_fvgExtend ? bar_index + 1 : bar_index, math.avg(low, high[2]), color = color.new(color.lime, 0))
+                array.unshift(smc_bullFvgMidLines, smc_bfvgLine)
+            smc_bullFvgSignal := true
+        if smc_bearGap
+            box smc_dfvg = box.new(bar_index - 2, low[2], smc_fvgExtend ? bar_index + 1 : bar_index, high, bgcolor = smc_fvgDnColor, border_color = color.new(color.red, 0))
+            array.unshift(smc_bearFvgBoxes, smc_dfvg)
+            if smc_fvgLine
+                line smc_dfvgLine = line.new(bar_index - 2, math.avg(low[2], high), smc_fvgExtend ? bar_index + 1 : bar_index, math.avg(low[2], high), color = color.new(color.red, 0))
+                array.unshift(smc_bearFvgMidLines, smc_dfvgLine)
+            smc_bearFvgSignal := true
+    if array.size(smc_structureLines) > 100
+        line.delete(array.pop(smc_structureLines))
+    if array.size(smc_structureLabels) > 100
+        label.delete(array.pop(smc_structureLabels))
+    if array.size(smc_mappingLines) > 80
+        line.delete(array.pop(smc_mappingLines))
+    if array.size(smc_eqLines) > 40
+        line.delete(array.pop(smc_eqLines))
+    if array.size(smc_eqLabels) > 40
+        label.delete(array.pop(smc_eqLabels))
+    if array.size(smc_bullObBoxes) > 0
+        for smc_i = array.size(smc_bullObBoxes) - 1 to 0
+            box smc_box = array.get(smc_bullObBoxes, smc_i)
+            float smc_top = box.get_top(smc_box)
+            float smc_btm = box.get_bottom(smc_box)
+            box.set_right(smc_box, bar_index)
+            if smc_i < array.size(smc_bullObMidLines)
+                line smc_line = array.get(smc_bullObMidLines, smc_i)
+                line.set_x2(smc_line, bar_index)
+            float smc_mitiSrc = smc_obMiti == "Close" ? close : smc_obMiti == "Wick" ? low : hl2
+            if smc_mitiSrc < smc_btm
+                box.delete(smc_box)
+                array.remove(smc_bullObBoxes, smc_i)
+                if smc_i < array.size(smc_bullObMidLines)
+                    line.delete(array.get(smc_bullObMidLines, smc_i))
+                    array.remove(smc_bullObMidLines, smc_i)
+            else if smc_i >= smc_obLast
+                box.delete(smc_box)
+                array.remove(smc_bullObBoxes, smc_i)
+    if array.size(smc_bearObBoxes) > 0
+        for smc_i = array.size(smc_bearObBoxes) - 1 to 0
+            box smc_box = array.get(smc_bearObBoxes, smc_i)
+            float smc_top = box.get_top(smc_box)
+            float smc_mitiSrc = smc_obMiti == "Close" ? close : smc_obMiti == "Wick" ? high : hl2
+            box.set_right(smc_box, bar_index)
+            if smc_i < array.size(smc_bearObMidLines)
+                line smc_line = array.get(smc_bearObMidLines, smc_i)
+                line.set_x2(smc_line, bar_index)
+            if smc_mitiSrc > smc_top
+                box.delete(smc_box)
+                array.remove(smc_bearObBoxes, smc_i)
+                if smc_i < array.size(smc_bearObMidLines)
+                    line.delete(array.get(smc_bearObMidLines, smc_i))
+                    array.remove(smc_bearObMidLines, smc_i)
+            else if smc_i >= smc_obLast
+                box.delete(smc_box)
+                array.remove(smc_bearObBoxes, smc_i)
+    if array.size(smc_bullFvgBoxes) > 0
+        for smc_i = array.size(smc_bullFvgBoxes) - 1 to 0
+            box smc_box = array.get(smc_bullFvgBoxes, smc_i)
+            float smc_btm = box.get_bottom(smc_box)
+            float smc_fvgSrc = smc_fvgMitigation == "Close" ? close : smc_fvgMitigation == "Wick" ? low : hl2
+            if smc_fvgExtend
+                box.set_right(smc_box, bar_index + 1)
+            if smc_i < array.size(smc_bullFvgMidLines)
+                line smc_line = array.get(smc_bullFvgMidLines, smc_i)
+                line.set_x2(smc_line, smc_fvgExtend ? bar_index + 1 : bar_index)
+            if smc_fvgSrc < smc_btm or smc_i >= smc_fvgLast
+                box.delete(smc_box)
+                array.remove(smc_bullFvgBoxes, smc_i)
+                if smc_i < array.size(smc_bullFvgMidLines)
+                    line.delete(array.get(smc_bullFvgMidLines, smc_i))
+                    array.remove(smc_bullFvgMidLines, smc_i)
+    if array.size(smc_bearFvgBoxes) > 0
+        for smc_i = array.size(smc_bearFvgBoxes) - 1 to 0
+            box smc_box = array.get(smc_bearFvgBoxes, smc_i)
+            float smc_top = box.get_top(smc_box)
+            float smc_fvgSrc = smc_fvgMitigation == "Close" ? close : smc_fvgMitigation == "Wick" ? high : hl2
+            if smc_fvgExtend
+                box.set_right(smc_box, bar_index + 1)
+            if smc_i < array.size(smc_bearFvgMidLines)
+                line smc_line = array.get(smc_bearFvgMidLines, smc_i)
+                line.set_x2(smc_line, smc_fvgExtend ? bar_index + 1 : bar_index)
+            if smc_fvgSrc > smc_top or smc_i >= smc_fvgLast
+                box.delete(smc_box)
+                array.remove(smc_bearFvgBoxes, smc_i)
+                if smc_i < array.size(smc_bearFvgMidLines)
+                    line.delete(array.get(smc_bearFvgMidLines, smc_i))
+                    array.remove(smc_bearFvgMidLines, smc_i)
+    smc_barColor := smc_colorCandles ? smc_trend == 1 ? color.new(smc_swingUpColor, 0) : smc_trend == -1 ? color.new(smc_swingDnColor, 0) : na : na
+
+var int srob_barback = 20
+if timeframe.isdaily or timeframe.isweekly
+    srob_barback := 40
+float srob_pivotHigh = ta.pivothigh(srob_barback, srob_highlow)
+float srob_pivotLow = ta.pivotlow(srob_barback, srob_highlow)
+var box[] srob_highBox = array.new_box()
+var box[] srob_lowBox = array.new_box()
+var line[] srob_highLine = array.new_line()
+var line[] srob_lowLine = array.new_line()
+var box[] srob_longObBox = array.new_box()
+var box[] srob_shortObBox = array.new_box()
+var line[] srob_longObLine = array.new_line()
+var line[] srob_shortObLine = array.new_line()
+var table srob_infoTable = table.new(position.top_right, 1, 1, bgcolor = color.new(color.black, 80), border_width = 1)
+bool srob_ob_short = false
+bool srob_ob_long = false
+var int srob_obhdx = na
+var int srob_obldx = na
+float srob_OB = (open - open[4]) / open[5] * 100
+if not show_SupportResistanceOB
+    srob_delete_boxes(srob_highBox)
+    srob_delete_boxes(srob_lowBox)
+    srob_delete_lines(srob_highLine)
+    srob_delete_lines(srob_lowLine)
+    srob_delete_boxes(srob_longObBox)
+    srob_delete_boxes(srob_shortObBox)
+    srob_delete_lines(srob_longObLine)
+    srob_delete_lines(srob_shortObLine)
+    table.clear(srob_infoTable, 0, 0, 0, 0)
+else
+    if ta.crossunder(srob_OB, -0.3)
+        srob_ob_short := true
+        srob_ob_long := false
+        srob_obhdx := bar_index
+    if ta.crossover(srob_OB, 0.3)
+        srob_ob_long := true
+        srob_ob_short := false
+        srob_obldx := bar_index
+    if srob_ob_short and srob_showOB and srob_obhdx - nz(srob_obhdx[1], srob_obhdx) > 10
+        int srob_bullOb = na
+        bool srob_valid = true
+        for srob_i = 4 to 15
+            if close[srob_i] > open[srob_i]
+                srob_bullOb := srob_i
+                break
+        if not na(srob_bullOb)
+            for [srob_index, srob_item] in srob_shortObBox
+                float srob_top = box.get_top(srob_item)
+                float srob_bottom = box.get_bottom(srob_item)
+                if (high[srob_bullOb] < srob_top and low[srob_bullOb] > srob_bottom) or (high[srob_bullOb] > srob_top and low[srob_bullOb] < srob_top) or (high[srob_bullOb] > srob_bottom and low[srob_bullOb] < srob_bottom)
+                    srob_valid := false
+            if srob_valid
+                if srob_displayType == "Boxes"
+                    box srob_drawShortBox = box.new(left = bar_index[srob_bullOb], top = high[srob_bullOb], right = bar_index[srob_bullOb], bottom = low[srob_bullOb], bgcolor = srob_obrcolor, border_color = srob_obbrcolor, text = "Bear OB", text_size = size.small)
+                    array.push(srob_shortObBox, srob_drawShortBox)
+                else
+                    line srob_newLine = line.new(bar_index[srob_bullOb], (high[srob_bullOb] + low[srob_bullOb]) / 2, bar_index[srob_bullOb], (high[srob_bullOb] + low[srob_bullOb]) / 2, color = srob_obbrcolor, width = srob_obLineWidth)
+                    array.push(srob_shortObLine, srob_newLine)
+    if srob_ob_long and srob_showOB and srob_obldx - nz(srob_obldx[1], srob_obldx) > 10
+        int srob_bearOb = na
+        bool srob_valid = true
+        for srob_i = 4 to 15
+            if close[srob_i] < open[srob_i]
+                srob_bearOb := srob_i
+                break
+        if not na(srob_bearOb)
+            for [srob_index, srob_item] in srob_longObBox
+                float srob_top = box.get_top(srob_item)
+                float srob_bottom = box.get_bottom(srob_item)
+                if (high[srob_bearOb] < srob_top and low[srob_bearOb] > srob_bottom) or (high[srob_bearOb] > srob_top and low[srob_bearOb] < srob_top) or (high[srob_bearOb] > srob_bottom and low[srob_bearOb] < srob_bottom)
+                    srob_valid := false
+            if srob_valid
+                if srob_displayType == "Boxes"
+                    box srob_drawLongBox = box.new(left = bar_index[srob_bearOb], top = high[srob_bearOb], right = bar_index[srob_bearOb], bottom = low[srob_bearOb], bgcolor = srob_obscolor, border_color = srob_obbscolor, text = "Bull OB", text_size = size.small)
+                    array.push(srob_longObBox, srob_drawLongBox)
+                else
+                    line srob_newLine = line.new(bar_index[srob_bearOb], (high[srob_bearOb] + low[srob_bearOb]) / 2, bar_index[srob_bearOb], (high[srob_bearOb] + low[srob_bearOb]) / 2, color = srob_obbscolor, width = srob_obLineWidth)
+                    array.push(srob_longObLine, srob_newLine)
+    if array.size(srob_shortObBox) > 0
+        for srob_i = array.size(srob_shortObBox) - 1 to 0
+            box srob_box = array.get(srob_shortObBox, srob_i)
+            box.set_right(srob_box, bar_index)
+            if high > box.get_top(srob_box)
+                box.delete(srob_box)
+                array.remove(srob_shortObBox, srob_i)
+        if array.size(srob_shortObBox) > srob_maxsr
+            box.delete(array.shift(srob_shortObBox))
+    if array.size(srob_longObBox) > 0
+        for srob_i = array.size(srob_longObBox) - 1 to 0
+            box srob_box = array.get(srob_longObBox, srob_i)
+            box.set_right(srob_box, bar_index)
+            if low < box.get_bottom(srob_box)
+                box.delete(srob_box)
+                array.remove(srob_longObBox, srob_i)
+        if array.size(srob_longObBox) > srob_maxsr
+            box.delete(array.shift(srob_longObBox))
+    if array.size(srob_shortObLine) > 0
+        for srob_i = array.size(srob_shortObLine) - 1 to 0
+            line srob_line = array.get(srob_shortObLine, srob_i)
+            line.set_x2(srob_line, bar_index)
+            if high > line.get_price(srob_line, bar_index)
+                line.delete(srob_line)
+                array.remove(srob_shortObLine, srob_i)
+        if array.size(srob_shortObLine) > srob_maxsr
+            line.delete(array.shift(srob_shortObLine))
+    if array.size(srob_longObLine) > 0
+        for srob_i = array.size(srob_longObLine) - 1 to 0
+            line srob_line = array.get(srob_longObLine, srob_i)
+            line.set_x2(srob_line, bar_index)
+            if low < line.get_price(srob_line, bar_index)
+                line.delete(srob_line)
+                array.remove(srob_longObLine, srob_i)
+        if array.size(srob_longObLine) > srob_maxsr
+            line.delete(array.shift(srob_longObLine))
+    if not na(srob_pivotHigh) and srob_showSR
+        bool srob_valid = true
+        for [srob_index, srob_item] in srob_highBox
+            float srob_top = box.get_top(srob_item)
+            float srob_bottom = box.get_bottom(srob_item)
+            if (high[srob_highlow] < srob_top and high[srob_highlow] > srob_bottom) or (high[srob_highlow] > srob_top and low[srob_highlow] < srob_top) or (high[srob_highlow] > srob_bottom and low[srob_highlow] < srob_bottom)
+                srob_valid := false
+        if srob_valid
+            if srob_displayType == "Boxes"
+                float srob_boxWidth = high[srob_highlow] - (high[srob_highlow] - low[srob_highlow]) / 4
+                array.push(srob_highBox, box.new(bar_index[srob_highlow], high[srob_highlow], bar_index, srob_boxWidth, bgcolor = srob_rcolor, text = "Resistance", text_size = size.small, border_color = srob_rcolor))
+            else
+                array.push(srob_highLine, line.new(bar_index[srob_highlow], high[srob_highlow], bar_index, high[srob_highlow], color = srob_rcolor, width = srob_srLineWidth))
+    if not na(srob_pivotLow) and srob_showSR
+        bool srob_valid = true
+        for [srob_index, srob_item] in srob_lowBox
+            float srob_top = box.get_top(srob_item)
+            float srob_bottom = box.get_bottom(srob_item)
+            if (low[srob_highlow] > srob_top and low[srob_highlow] < srob_bottom) or (high[srob_highlow] > srob_top and low[srob_highlow] < srob_top) or (high[srob_highlow] > srob_bottom and low[srob_highlow] < srob_bottom)
+                srob_valid := false
+        if srob_valid
+            if srob_displayType == "Boxes"
+                float srob_boxWidth = low[srob_highlow] + (high[srob_highlow] - low[srob_highlow]) / 4
+                array.push(srob_lowBox, box.new(bar_index[srob_highlow], low[srob_highlow], bar_index, srob_boxWidth, bgcolor = srob_scolor, text = "Support", text_size = size.small, border_color = srob_scolor))
+            else
+                array.push(srob_lowLine, line.new(bar_index[srob_highlow], low[srob_highlow], bar_index, low[srob_highlow], color = srob_scolor, width = srob_srLineWidth))
+    if array.size(srob_highBox) > 0
+        for srob_i = array.size(srob_highBox) - 1 to 0
+            box srob_item = array.get(srob_highBox, srob_i)
+            box.set_right(srob_item, bar_index)
+            if high >= box.get_top(srob_item)
+                if srob_hshow
+                    box.set_border_color(srob_item, srob_brcolor)
+                    box.set_bottom(srob_item, box.get_top(srob_item))
+                    box.set_text(srob_item, "R")
+                    array.remove(srob_highBox, srob_i)
+                else
+                    box.delete(srob_item)
+                    array.remove(srob_highBox, srob_i)
+    if array.size(srob_lowBox) > 0
+        for srob_i = array.size(srob_lowBox) - 1 to 0
+            box srob_item = array.get(srob_lowBox, srob_i)
+            box.set_right(srob_item, bar_index)
+            if low <= box.get_top(srob_item)
+                if srob_hshow
+                    box.set_border_color(srob_item, srob_bscolor)
+                    box.set_bottom(srob_item, box.get_top(srob_item))
+                    box.set_text(srob_item, "S")
+                    array.remove(srob_lowBox, srob_i)
+                else
+                    box.delete(srob_item)
+                    array.remove(srob_lowBox, srob_i)
+    if array.size(srob_highLine) > 0
+        for srob_i = array.size(srob_highLine) - 1 to 0
+            line srob_item = array.get(srob_highLine, srob_i)
+            line.set_x2(srob_item, bar_index)
+            if high >= line.get_price(srob_item, bar_index)
+                if srob_hshow
+                    line.set_color(srob_item, srob_brcolor)
+                    array.remove(srob_highLine, srob_i)
+                else
+                    line.delete(srob_item)
+                    array.remove(srob_highLine, srob_i)
+    if array.size(srob_lowLine) > 0
+        for srob_i = array.size(srob_lowLine) - 1 to 0
+            line srob_item = array.get(srob_lowLine, srob_i)
+            line.set_x2(srob_item, bar_index)
+            if low <= line.get_price(srob_item, bar_index)
+                if srob_hshow
+                    line.set_color(srob_item, srob_bscolor)
+                    array.remove(srob_lowLine, srob_i)
+                else
+                    line.delete(srob_item)
+                    array.remove(srob_lowLine, srob_i)
+    if barstate.islast and srob_showInfoLabel
+        table.cell(srob_infoTable, 0, 0, "Support Resistance with Order Blocks[TMF]\nSymbol: " + syminfo.ticker + "\nTimeframe: " + timeframe.period, text_color = color.white, text_size = size.small)
+
+obs_bullishImb(i) => close[i + 1] > high[i + 2] and low[i] > high[i + 2]
+obs_bearishImb(i) => close[i + 1] < low[i + 2] and high[i] < low[i + 2]
+obs_isRegularFractal(mode) => mode == "Buy" ? high[0] < high[1] and (high[2] < high[1] or high[2] == high[1] and high[3] < high[2]) : mode == "Sell" ? low[0] > low[1] and (low[2] > low[1] or low[2] == low[1] and low[3] > low[2]) : false
+obs_isBWFractal(mode) => mode == "Buy" ? high[0] < high[2] and high[1] < high[2] and high[3] < high[2] and high[4] < high[2] : mode == "Sell" ? low[0] > low[2] and low[1] > low[2] and low[3] > low[2] and low[4] > low[2] : false
+obs_isFractalHigh() => obs_filterFractal == "3" ? obs_isRegularFractal("Buy") : obs_isBWFractal("Buy")
+obs_isFractalLow() => obs_filterFractal == "3" ? obs_isRegularFractal("Sell") : obs_isBWFractal("Sell")
+obs_resolutionInMinutes() => timeframe.multiplier * (timeframe.isseconds ? 1. / 60 : timeframe.isminutes ? 1. : timeframe.isdaily ? 60. * 24 : timeframe.isweekly ? 60. * 24 * 7 : timeframe.ismonthly ? 60. * 24 * 30.4375 : na)
+obs_f_timeFrom(length, i) => int(time[i] + obs_resolutionInMinutes() * 60 * 1000 * length)
+var float[] obs_fractal_highs = array.new_float()
+var int[] obs_fractal_high_times = array.new_int()
+var float[] obs_fractal_lows = array.new_float()
+var int[] obs_fractal_low_times = array.new_int()
+var line[] obs_line1 = array.new_line()
+var line[] obs_line2 = array.new_line()
+var line[] obs_line3 = array.new_line()
+var line[] obs_line4 = array.new_line()
+var label[] obs_label1 = array.new_label()
+var label[] obs_label2 = array.new_label()
+string obs_lineStyle = obs_linesStyle == "Solid" ? line.style_solid : obs_linesStyle == "Dashed" ? line.style_dashed : line.style_dotted
+if not show_OrderblocksNephewSam
+    array.clear(obs_fractal_highs)
+    array.clear(obs_fractal_high_times)
+    array.clear(obs_fractal_lows)
+    array.clear(obs_fractal_low_times)
+    obs_delete_lines(obs_line1)
+    obs_delete_lines(obs_line2)
+    obs_delete_lines(obs_line3)
+    obs_delete_lines(obs_line4)
+    obs_delete_labels(obs_label1)
+    obs_delete_labels(obs_label2)
+else
+    if obs_isFractalHigh()
+        array.push(obs_fractal_highs, obs_filterFractal == "3" ? high[1] : high[2])
+        array.push(obs_fractal_high_times, obs_filterFractal == "3" ? time[1] : time[2])
+    if obs_isFractalLow()
+        array.push(obs_fractal_lows, obs_filterFractal == "3" ? low[1] : low[2])
+        array.push(obs_fractal_low_times, obs_filterFractal == "3" ? time[1] : time[2])
+    if array.size(obs_fractal_lows) > 0
+        for obs_i = array.size(obs_fractal_lows) - 1 to 0
+            if (obs_findObType == "Close" ? close : low) < array.get(obs_fractal_lows, obs_i)
+                int obs_idx = 0
+                float obs_max = low
+                int obs_gapIndex = 0
+                for obs_k = 0 to 500
+                    bool obs_bearishGap = close[obs_k + 1] < low[obs_k + 2] and high[obs_k] < low[obs_k + 2]
+                    if time[obs_k] < array.get(obs_fractal_low_times, obs_i)
+                        break
+                    if close[obs_k] > open[obs_k] and high[obs_k] > obs_max
+                        obs_idx := obs_k
+                        obs_max := high[obs_k]
+                    if obs_bearishGap and high[obs_k] > obs_max
+                        obs_gapIndex := obs_k + 2
+                bool obs_filterFvgPass = obs_filterFvgs ? obs_gapIndex > 0 and obs_idx - obs_gapIndex >= 0 and obs_idx - obs_gapIndex <= obs_fvgDistance : true
+                if obs_idx != 0 and obs_filterFvgPass
+                    int obs_TimeTo = obs_f_timeFrom(obs_lineLength, obs_idx)
+                    float obs_loc = obs_lineHeight == "Body" ? open[obs_idx] : low[obs_idx]
+                    array.push(obs_line1, line.new(x1 = time[obs_idx], y1 = high[obs_idx], x2 = obs_TimeTo, y2 = high[obs_idx], xloc = xloc.bar_time, style = obs_lineStyle, color = obs_bearLineColor, width = obs_linesWidth))
+                    array.push(obs_line2, line.new(x1 = time[obs_idx], y1 = obs_loc, x2 = obs_TimeTo, y2 = obs_loc, xloc = xloc.bar_time, style = obs_lineStyle, color = obs_bearLineColor, width = obs_linesWidth))
+                array.remove(obs_fractal_lows, obs_i)
+                array.remove(obs_fractal_low_times, obs_i)
+    if array.size(obs_fractal_highs) > 0
+        for obs_i = array.size(obs_fractal_highs) - 1 to 0
+            if (obs_findObType == "Close" ? close : high) > array.get(obs_fractal_highs, obs_i)
+                int obs_idx = 0
+                float obs_min = low
+                int obs_gapIndex = 0
+                for obs_k = 0 to 500
+                    bool obs_bullishGap = close[obs_k + 1] > high[obs_k + 2] and low[obs_k] > high[obs_k + 2]
+                    if time[obs_k] < array.get(obs_fractal_high_times, obs_i)
+                        break
+                    if close[obs_k] < open[obs_k] and low[obs_k] < obs_min
+                        obs_idx := obs_k
+                        obs_min := low[obs_k]
+                    if obs_bullishGap
+                        obs_gapIndex := obs_k + 2
+                bool obs_filterFvgPass = obs_filterFvgs ? obs_gapIndex > 0 and obs_idx - obs_gapIndex >= 0 and obs_idx - obs_gapIndex <= obs_fvgDistance : true
+                if obs_idx != 0 and obs_filterFvgPass
+                    int obs_TimeTo = obs_f_timeFrom(obs_lineLength, obs_idx)
+                    float obs_loc = obs_lineHeight == "Body" ? open[obs_idx] : high[obs_idx]
+                    array.push(obs_line3, line.new(x1 = time[obs_idx], y1 = low[obs_idx], x2 = obs_TimeTo, y2 = low[obs_idx], xloc = xloc.bar_time, style = obs_lineStyle, color = obs_bullLineColor, width = obs_linesWidth))
+                    array.push(obs_line4, line.new(x1 = time[obs_idx], y1 = obs_loc, x2 = obs_TimeTo, y2 = obs_loc, xloc = xloc.bar_time, style = obs_lineStyle, color = obs_bullLineColor, width = obs_linesWidth))
+                array.remove(obs_fractal_highs, obs_i)
+                array.remove(obs_fractal_high_times, obs_i)
+    if array.size(obs_line1) > 0
+        for obs_i = array.size(obs_line1) - 1 to 0
+            if high >= line.get_y1(array.get(obs_line1, obs_i)) and high >= line.get_y1(array.get(obs_line2, obs_i))
+                if obs_delLines
+                    line.delete(array.get(obs_line1, obs_i))
+                    line.delete(array.get(obs_line2, obs_i))
+                array.remove(obs_line1, obs_i)
+                array.remove(obs_line2, obs_i)
+    if array.size(obs_line3) > 0
+        for obs_i = array.size(obs_line3) - 1 to 0
+            if low <= line.get_y1(array.get(obs_line3, obs_i)) and low <= line.get_y1(array.get(obs_line4, obs_i))
+                if obs_delLines
+                    line.delete(array.get(obs_line3, obs_i))
+                    line.delete(array.get(obs_line4, obs_i))
+                array.remove(obs_line3, obs_i)
+                array.remove(obs_line4, obs_i)
+
+bool twz_C_DownTrend = true
+if twz_trendRule == twz_trendRule1
+    float twz_priceAvg = ta.sma(close, 50)
+    twz_C_DownTrend := close < twz_priceAvg
+if twz_trendRule == twz_trendRule2
+    float twz_sma200 = ta.sma(close, 200)
+    float twz_sma50 = ta.sma(close, 50)
+    twz_C_DownTrend := close < twz_sma50 and twz_sma50 < twz_sma200
+float twz_C_BodyHi = math.max(close, open)
+float twz_C_BodyLo = math.min(close, open)
+float twz_C_Body = twz_C_BodyHi - twz_C_BodyLo
+float twz_C_BodyAvg = ta.ema(twz_C_Body, 14)
+float twz_C_UpShadow = high - twz_C_BodyHi
+float twz_C_DnShadow = twz_C_BodyLo - low
+float twz_C_Range = high - low
+bool twz_C_IsDojiBody = twz_C_Range > 0 and twz_C_Body <= twz_C_Range * 5.0 / 100
+bool twz_C_HasUpShadow = twz_C_UpShadow > 5.0 / 100 * twz_C_Body
+bool twz_C_HasDnShadow = twz_C_DnShadow > 5.0 / 100 * twz_C_Body
+bool twz_C_WhiteBody = open < close
+bool twz_C_BlackBody = open > close
+bool twz_C_TweezerBottomBullish = show_TweezerBottom and twz_C_DownTrend[1] and (not twz_C_IsDojiBody or (twz_C_HasUpShadow and twz_C_HasDnShadow)) and math.abs(low - low[1]) <= twz_C_BodyAvg * 0.05 and twz_C_BlackBody[1] and twz_C_WhiteBody and math.abs(twz_C_Body - twz_C_Body[1]) <= twz_C_BodyAvg * 0.05
+plotshape(show_TweezerBottom and twz_C_TweezerBottomBullish, title = "Tweezer Bottom", text = "TB", style = shape.labelup, location = location.belowbar, color = twz_labelBullish, textcolor = color.white)
+bgcolor(show_TweezerBottom and twz_showBackground and ta.highest(twz_C_TweezerBottomBullish ? 1 : 0, 2) != 0 ? color.new(twz_labelBullish, 90) : na, offset = -1)
+alertcondition(show_TweezerBottom and twz_C_TweezerBottomBullish, title = "New Tweezer Bottom detected", message = "New Tweezer Bottom – Bullish pattern detected")
+
+float st_atr = st_mult * ta.atr(st_length)
+float st_highPrice = st_wicks ? high : close
+float st_lowPrice = st_wicks ? low : close
+bool st_doji4price = open == close and open == low and open == high
+float st_longStop = st_src - st_atr
+float st_longStopPrev = nz(st_longStop[1], st_longStop)
+st_longStop := st_longStop > 0 ? st_doji4price ? st_longStopPrev : st_lowPrice[1] > st_longStopPrev ? math.max(st_longStop, st_longStopPrev) : st_longStop : st_longStopPrev
+float st_shortStop = st_src + st_atr
+float st_shortStopPrev = nz(st_shortStop[1], st_shortStop)
+st_shortStop := st_shortStop > 0 ? st_doji4price ? st_shortStopPrev : st_highPrice[1] < st_shortStopPrev ? math.min(st_shortStop, st_shortStopPrev) : st_shortStop : st_shortStopPrev
+var int st_dir = 1
+st_dir := st_dir == -1 and st_highPrice > st_shortStopPrev ? 1 : st_dir == 1 and st_lowPrice < st_longStopPrev ? -1 : st_dir
+bool st_buySignal = show_Supertrend and st_dir == 1 and st_dir[1] == -1
+bool st_sellSignal = show_Supertrend and st_dir == -1 and st_dir[1] == 1
+st_longStopPlot = plot(show_Supertrend and st_dir == 1 ? st_longStop : na, "SuperTrend Long Stop", style = plot.style_linebr, linewidth = 2, color = color.green)
+st_shortStopPlot = plot(show_Supertrend and st_dir == -1 ? st_shortStop : na, "SuperTrend Short Stop", style = plot.style_linebr, linewidth = 2, color = color.red)
+st_midPricePlot = plot(show_Supertrend ? ohlc4 : na, "", display = display.none, editable = false)
+fill(st_midPricePlot, st_longStopPlot, title = "SuperTrend Long State Filling", color = show_Supertrend and st_highlightState and st_dir == 1 ? color.new(color.green, 85) : na)
+fill(st_midPricePlot, st_shortStopPlot, title = "SuperTrend Short State Filling", color = show_Supertrend and st_highlightState and st_dir == -1 ? color.new(color.red, 85) : na)
+plotshape(show_Supertrend and st_buySignal ? st_longStop : na, title = "Long Stop Start", location = location.absolute, style = shape.circle, size = size.tiny, color = color.green)
+plotshape(show_Supertrend and st_buySignal and st_showLabels ? st_longStop : na, title = "Buy Label", text = "Buy", location = location.absolute, style = shape.labelup, size = size.tiny, color = color.green, textcolor = color.white)
+plotshape(show_Supertrend and st_sellSignal ? st_shortStop : na, title = "Short Stop Start", location = location.absolute, style = shape.circle, size = size.tiny, color = color.red)
+plotshape(show_Supertrend and st_sellSignal and st_showLabels ? st_shortStop : na, title = "Sell Label", text = "Sell", location = location.absolute, style = shape.labeldown, size = size.tiny, color = color.red, textcolor = color.white)
+alertcondition(show_Supertrend and st_dir != st_dir[1], title = "SuperTrend Direction Change", message = "SuperTrend has changed direction")
+alertcondition(show_Supertrend and st_buySignal, title = "SuperTrend Buy", message = "SuperTrend Buy")
+alertcondition(show_Supertrend and st_sellSignal, title = "SuperTrend Sell", message = "SuperTrend Sell")
+
+rsi_ma(source, length, maType) => maType == "SMA" or maType == "SMA + Bollinger Bands" ? ta.sma(source, length) : maType == "EMA" ? ta.ema(source, length) : maType == "SMMA (RMA)" ? ta.rma(source, length) : maType == "WMA" ? ta.wma(source, length) : ta.vwma(source, length)
+float rsi_change = ta.change(rsi_rsiSourceInput)
+float rsi_up = ta.rma(math.max(rsi_change, 0), rsi_rsiLengthInput)
+float rsi_down = ta.rma(-math.min(rsi_change, 0), rsi_rsiLengthInput)
+float rsi_value = rsi_down == 0 ? 100 : rsi_up == 0 ? 0 : 100 - (100 / (1 + rsi_up / rsi_down))
+bool rsi_enableMA = rsi_maTypeInput != "None"
+bool rsi_isBB = rsi_maTypeInput == "SMA + Bollinger Bands"
+float rsi_smoothingMA = rsi_enableMA ? rsi_ma(rsi_value, rsi_maLengthInput, rsi_maTypeInput) : na
+float rsi_smoothingStDev = rsi_isBB ? ta.stdev(rsi_value, rsi_maLengthInput) * rsi_bbMultInput : na
+bool rsi_bullCross = show_RSI and rsi_enableMA and ta.crossover(rsi_value, rsi_smoothingMA)
+bool rsi_bearCross = show_RSI and rsi_enableMA and ta.crossunder(rsi_value, rsi_smoothingMA)
+color rsi_barColor = show_RSI and rsi_showCrossColour ? rsi_bullCross ? rsi_crossBullColour : rsi_bearCross ? rsi_crossBearColour : na : na
+int rsi_lookbackRight = 5
+int rsi_lookbackLeft = 5
+int rsi_rangeUpper = 60
+int rsi_rangeLower = 5
+rsi_inRange(cond) => ta.barssince(cond) >= rsi_rangeLower and ta.barssince(cond) <= rsi_rangeUpper
+bool rsi_plFound = show_RSI and rsi_calculateDivergence and not na(ta.pivotlow(rsi_value, rsi_lookbackLeft, rsi_lookbackRight))
+bool rsi_phFound = show_RSI and rsi_calculateDivergence and not na(ta.pivothigh(rsi_value, rsi_lookbackLeft, rsi_lookbackRight))
+float rsi_lbr = rsi_value[rsi_lookbackRight]
+bool rsi_bullCondDiv = show_RSI and rsi_calculateDivergence and low[rsi_lookbackRight] < ta.valuewhen(rsi_plFound, low[rsi_lookbackRight], 1) and rsi_lbr > ta.valuewhen(rsi_plFound, rsi_lbr, 1) and rsi_inRange(rsi_plFound[1])
+bool rsi_bearCondDiv = show_RSI and rsi_calculateDivergence and high[rsi_lookbackRight] > ta.valuewhen(rsi_phFound, high[rsi_lookbackRight], 1) and rsi_lbr < ta.valuewhen(rsi_phFound, rsi_lbr, 1) and rsi_inRange(rsi_phFound[1])
+float rsi_overlayBase = ta.lowest(low, rsi_overlayLookback) - ta.atr(14) * rsi_overlayAtrMult
+float rsi_overlayScale = ta.atr(14) * rsi_overlayScaleAtr / 100.
+plot(show_RSI ? rsi_overlayBase + rsi_value * rsi_overlayScale : na, "RSI Overlay", color = #7E57C2)
+plot(show_RSI and rsi_enableMA ? rsi_overlayBase + rsi_smoothingMA * rsi_overlayScale : na, "RSI MA Overlay", color = color.yellow)
+plot(show_RSI ? rsi_overlayBase + 70 * rsi_overlayScale : na, "RSI 70", color = color.new(color.gray, 60))
+plot(show_RSI ? rsi_overlayBase + 50 * rsi_overlayScale : na, "RSI 50", color = color.new(color.gray, 80))
+plot(show_RSI ? rsi_overlayBase + 30 * rsi_overlayScale : na, "RSI 30", color = color.new(color.gray, 60))
+plotshape(show_RSI and rsi_bullCondDiv ? low[rsi_lookbackRight] : na, offset = -rsi_lookbackRight, title = "RSI Bull Div", text = "Bull", style = shape.labelup, location = location.belowbar, color = color.green, textcolor = color.white)
+plotshape(show_RSI and rsi_bearCondDiv ? high[rsi_lookbackRight] : na, offset = -rsi_lookbackRight, title = "RSI Bear Div", text = "Bear", style = shape.labeldown, location = location.abovebar, color = color.red, textcolor = color.white)
+alertcondition(show_RSI and rsi_bullCross, title = "RSI Crossed Above VWMA", message = "RSI crossed above VWMA")
+alertcondition(show_RSI and rsi_bearCross, title = "RSI Crossed Below VWMA", message = "RSI crossed below VWMA")
+alertcondition(show_RSI and rsi_bullCondDiv, title = "Regular Bullish Divergence", message = "Found a new Regular Bullish Divergence")
+alertcondition(show_RSI and rsi_bearCondDiv, title = "Regular Bearish Divergence", message = "Found a new Regular Bearish Divergence")
+
+[macd_macdLine, macd_signalLine, macd_histLine] = ta.macd(macd_source, macd_fastlen, macd_slowlen, macd_siglen)
+bool macd_CrossOver = show_MACD and ta.crossover(macd_macdLine, macd_signalLine)
+bool macd_CrossUnder = show_MACD and ta.crossunder(macd_macdLine, macd_signalLine)
+color macd_barColor = show_MACD ? macd_macdLine > macd_signalLine ? color.green : color.red : na
+color macd_bgColor = show_MACD ? macd_CrossOver ? color.new(color.green, 88) : macd_CrossUnder ? color.new(color.red, 88) : na : na
+float macd_overlayBase = ta.lowest(low, macd_overlayLookback) - ta.atr(14) * macd_overlayAtrMult
+float macd_scale = ta.atr(14) * macd_overlayScaleAtr / math.max(ta.highest(math.abs(macd_histLine), 100), 1)
+plot(show_MACD ? macd_overlayBase + macd_macdLine * macd_scale : na, "MACD Overlay", color = macd_macdLine > macd_signalLine ? color.green : color.red, linewidth = 2)
+plot(show_MACD ? macd_overlayBase + macd_signalLine * macd_scale : na, "MACD Signal Overlay", color = color.yellow)
+plot(show_MACD ? macd_overlayBase + macd_histLine * macd_scale : na, "MACD Histogram Overlay", color = macd_histLine < 0 ? color.red : color.green, style = plot.style_histogram)
+alertcondition(show_MACD and macd_CrossOver, "Bullish MACD Crossover", "MACD Bullish Crossover")
+alertcondition(show_MACD and macd_CrossUnder, "Bearish MACD Crossover", "MACD Bearish Crossover")
+
+float atrr_s = syminfo.pointvalue * ta.atr(atrr_length)
+float atrr_shortATR = close[1] + atrr_s * atrr_multiplier
+float atrr_longATR = close[1] - atrr_s * atrr_multiplier
+float atrr_High = ta.highest(atrr_shortATR, atrr_lookBack)
+float atrr_Low = ta.lowest(atrr_longATR, atrr_lookBack)
+float atrr_highRatio = ((close - atrr_Low) / math.max(atrr_High - atrr_Low, syminfo.mintick)) * 500
+float atrr_lowRatio = -((atrr_High - close) / math.max(atrr_High - atrr_Low, syminfo.mintick)) * 500
+float atrr_z = atrr_highRatio + atrr_lowRatio
+bool atrr_bullishRule = atrr_z >= 100
+bool atrr_bearishRule = atrr_z <= -100
+var int atrr_ruleState = 0
+atrr_ruleState := atrr_bullishRule ? 1 : atrr_bearishRule ? -1 : nz(atrr_ruleState[1])
+float atrr_Up = hl2 - atrr_factor * ta.atr(atrr_pd)
+float atrr_Dn = hl2 + atrr_factor * ta.atr(atrr_pd)
+var float atrr_TrendUp = 0.0
+var float atrr_TrendDown = 0.0
+var float atrr_Trend = 1.0
+atrr_TrendUp := close[1] > atrr_TrendUp[1] ? math.max(atrr_Up, atrr_TrendUp[1]) : atrr_Up
+atrr_TrendDown := close[1] < atrr_TrendDown[1] ? math.min(atrr_Dn, atrr_TrendDown[1]) : atrr_Dn
+atrr_Trend := close > atrr_TrendDown[1] ? 1 : close < atrr_TrendUp[1] ? -1 : nz(atrr_Trend[1], 1)
+float atrr_Tsl = atrr_Trend == 1 ? atrr_TrendUp : atrr_TrendDown
+bool atrr_up = atrr_Trend == 1
+bool atrr_down = atrr_Trend == -1
+bool atrr_longCond = ta.crossover(atrr_z, 50) and atrr_up
+bool atrr_shortCond = ta.crossunder(atrr_z, -50) and atrr_down
+var int atrr_sectionLongs = 0
+var int atrr_sectionShorts = 0
+if atrr_longCond
+    atrr_sectionLongs += 1
+    atrr_sectionShorts := 0
+if atrr_shortCond
+    atrr_sectionShorts += 1
+    atrr_sectionLongs := 0
+bool atrr_longCondition = show_ATRRatio and atrr_longCond and atrr_sectionLongs <= 1
+bool atrr_shortCondition = show_ATRRatio and atrr_shortCond and atrr_sectionShorts <= 1
+var float atrr_last_open_long = na
+var float atrr_last_open_short = na
+atrr_last_open_long := atrr_longCondition ? open : nz(atrr_last_open_long[1])
+atrr_last_open_short := atrr_shortCondition ? open : nz(atrr_last_open_short[1])
+var int atrr_last_longCondition = na
+var int atrr_last_shortCondition = na
+atrr_last_longCondition := atrr_longCondition ? time : nz(atrr_last_longCondition[1])
+atrr_last_shortCondition := atrr_shortCondition ? time : nz(atrr_last_shortCondition[1])
+bool atrr_in_longCondition = atrr_last_longCondition > atrr_last_shortCondition
+bool atrr_in_shortCondition = atrr_last_shortCondition > atrr_last_longCondition
+bool atrr_long_tp = show_ATRRatio and atrr_isTPl and ta.crossover(high, (1 + atrr_tp / 100) * atrr_last_open_long) and not atrr_longCondition and atrr_in_longCondition
+bool atrr_short_tp = show_ATRRatio and atrr_isTPs and ta.crossunder(low, (1 - atrr_tp / 100) * atrr_last_open_short) and not atrr_shortCondition and atrr_in_shortCondition
+var int atrr_last_long_close = na
+var int atrr_last_short_close = na
+atrr_last_long_close := atrr_long_tp ? time : nz(atrr_last_long_close[1])
+atrr_last_short_close := atrr_short_tp ? time : nz(atrr_last_short_close[1])
+float atrr_overlayBase = ta.lowest(low, atrr_overlayLookback) - ta.atr(14) * atrr_overlayAtrMult
+float atrr_overlayScale = ta.atr(14) * atrr_overlayScaleAtr / 500.
+plot(show_ATRRatio ? atrr_Tsl : na, "ATR Ratio SuperTrend", color = atrr_Trend == 1 ? color.green : color.red, linewidth = 1)
+plot(show_ATRRatio ? atrr_overlayBase + atrr_z * atrr_overlayScale : na, "ATR Ratio Overlay", color = color.new(color.aqua, 0))
+plotshape(atrr_longCondition, title = "ATR Ratio Long", color = color.green, textcolor = color.green, style = shape.triangleup, location = location.belowbar, size = size.small, text = "LONG")
+plotshape(atrr_shortCondition, title = "ATR Ratio Short", color = color.red, textcolor = color.red, style = shape.triangledown, location = location.abovebar, size = size.small, text = "SHORT")
+plotshape(show_ATRRatio and atrr_long_tp and atrr_last_longCondition > nz(atrr_last_long_close[1]), text = "TP", title = "Take Profit Long", style = shape.triangledown, location = location.abovebar, color = color.red)
+plotshape(show_ATRRatio and atrr_short_tp and atrr_last_shortCondition > nz(atrr_last_short_close[1]), text = "TP", title = "Take Profit Short", style = shape.triangleup, location = location.belowbar, color = color.lime)
+alertcondition(atrr_longCondition, title = "ATR Ratio Long Alert", message = "ATR Ratio Long")
+alertcondition(atrr_shortCondition, title = "ATR Ratio Short Alert", message = "ATR Ratio Short")
+alertcondition(show_ATRRatio and atrr_long_tp and atrr_last_longCondition > nz(atrr_last_long_close[1]), title = "ATR Ratio Take Profit Long", message = "ATR Ratio Take Profit Long")
+alertcondition(show_ATRRatio and atrr_short_tp and atrr_last_shortCondition > nz(atrr_last_short_close[1]), title = "ATR Ratio Take Profit Short", message = "ATR Ratio Take Profit Short")
+
+float ema_ema9 = ta.ema(close, ema_len9)
+float ema_ema21 = ta.ema(close, ema_len21)
+float ema_ema50 = ta.ema(close, ema_len50)
+float ema_ema200 = ta.ema(close, ema_len200)
+float ema_atr = ta.atr(ema_atrLen)
+float ema_volSma = ta.sma(volume, ema_volLen)
+bool ema_longOnly = close > ema_ema200
+bool ema_trendValid = ema_ema21 > ema_ema50
+bool ema_noBuys = close < ema_ema50
+float ema_distTo21 = math.abs(close - ema_ema21)
+bool ema_near21 = ema_useATRProximity ? ema_distTo21 <= ema_atr * ema_atrMult : ema_distTo21 <= close * (ema_pctProximity / 100)
+bool ema_volDriesUp = volume < ema_volSma * ema_volDryFactor
+bool ema_bullishCandle = ema_bullishMode == "Close>Open" ? close > open : close > high[1]
+bool ema_setupReady = show_EMA and ema_longOnly and ema_trendValid and not ema_noBuys and ema_near21 and ema_volDriesUp
+bool ema_buySignal = show_EMA and ema_setupReady and ema_bullishCandle
+color ema_bgColor = show_EMA and ema_showBg ? ema_longOnly and ema_trendValid and not ema_noBuys ? color.new(color.green, 88) : ema_longOnly and not ema_trendValid and not ema_noBuys ? color.new(color.orange, 88) : color.new(color.red, 88) : na
+plot(show_EMA ? ema_ema9 : na, "EMA 9", linewidth = 1)
+plot(show_EMA ? ema_ema21 : na, "EMA 21", linewidth = 2)
+plot(show_EMA ? ema_ema50 : na, "EMA 50", linewidth = 2)
+plot(show_EMA ? ema_ema200 : na, "EMA 200", linewidth = 2)
+plotshape(show_EMA and ema_setupReady, title = "EMA Setup Ready", style = shape.circle, size = size.tiny, text = "SET", location = location.belowbar, color = color.new(color.blue, 0))
+plotshape(show_EMA and ema_buySignal, title = "EMA BUY Signal", style = shape.labelup, size = size.small, text = "BUY", location = location.belowbar, color = color.new(color.lime, 0))
+var table ema_t = table.new(position.top_right, 1, 5)
+if show_EMA and ema_showStatus and barstate.islast
+    table.cell(ema_t, 0, 0, ema_longOnly ? "Long-only: ON" : "Long-only: OFF", text_color = color.white, bgcolor = ema_longOnly ? color.new(color.green, 0) : color.new(color.red, 0))
+    table.cell(ema_t, 0, 1, ema_trendValid ? "Trend valid: 21>50" : "Trend: NO", text_color = color.white, bgcolor = ema_trendValid ? color.new(color.green, 0) : color.new(color.orange, 0))
+    table.cell(ema_t, 0, 2, ema_near21 ? "Pullback: near 21" : "Pullback: far", text_color = color.white, bgcolor = ema_near21 ? color.new(color.blue, 0) : color.new(color.gray, 40))
+    table.cell(ema_t, 0, 3, ema_volDriesUp ? "Volume: dries up" : "Volume: no", text_color = color.white, bgcolor = ema_volDriesUp ? color.new(color.blue, 0) : color.new(color.gray, 40))
+    table.cell(ema_t, 0, 4, ema_noBuys ? "NO BUYS" : "Buys OK", text_color = color.white, bgcolor = ema_noBuys ? color.new(color.red, 0) : color.new(color.green, 0))
+if (not show_EMA or not ema_showStatus) and barstate.islast
+    table.clear(ema_t, 0, 0, 0, 4)
+alertcondition(ema_setupReady, title = "EMA Setup Ready", message = "EMA setup ready")
+alertcondition(ema_buySignal, title = "EMA BUY Signal", message = "EMA BUY signal")
+
+float tlb_upper = 0.
+float tlb_lower = 0.
+float tlb_slope_ph = 0.
+float tlb_slope_pl = 0.
+int tlb_offset = tlb_backpaint ? tlb_length : 0
+float tlb_n = bar_index
+float tlb_src = close
+float tlb_ph = ta.pivothigh(tlb_length, tlb_length)
+float tlb_pl = ta.pivotlow(tlb_length, tlb_length)
+float tlb_slope = tlb_calcMethod == "Atr" ? ta.atr(tlb_length) / tlb_length * tlb_mult : tlb_calcMethod == "Stdev" ? ta.stdev(tlb_src, tlb_length) / tlb_length * tlb_mult : math.abs(ta.sma(tlb_src * tlb_n, tlb_length) - ta.sma(tlb_src, tlb_length) * ta.sma(tlb_n, tlb_length)) / ta.variance(tlb_n, tlb_length) / 2 * tlb_mult
+tlb_slope_ph := not na(tlb_ph) ? tlb_slope : tlb_slope_ph
+tlb_slope_pl := not na(tlb_pl) ? tlb_slope : tlb_slope_pl
+tlb_upper := not na(tlb_ph) ? tlb_ph : tlb_upper - tlb_slope_ph
+tlb_lower := not na(tlb_pl) ? tlb_pl : tlb_lower + tlb_slope_pl
+var int tlb_upos = 0
+var int tlb_dnos = 0
+tlb_upos := not na(tlb_ph) ? 0 : close > tlb_upper - tlb_slope_ph * tlb_length ? 1 : tlb_upos
+tlb_dnos := not na(tlb_pl) ? 0 : close < tlb_lower + tlb_slope_pl * tlb_length ? 1 : tlb_dnos
+var line tlb_uptl = line.new(na, na, na, na, color = tlb_upCss, style = line.style_dashed, extend = extend.right)
+var line tlb_dntl = line.new(na, na, na, na, color = tlb_dnCss, style = line.style_dashed, extend = extend.right)
+if not show_TrendlinesWithBreaks
+    line.delete(tlb_uptl)
+    line.delete(tlb_dntl)
+    tlb_uptl := line.new(na, na, na, na, color = tlb_upCss, style = line.style_dashed, extend = extend.right)
+    tlb_dntl := line.new(na, na, na, na, color = tlb_dnCss, style = line.style_dashed, extend = extend.right)
+else
+    if not na(tlb_ph) and tlb_showExt
+        line.set_xy1(tlb_uptl, bar_index - tlb_offset, tlb_backpaint ? tlb_ph : tlb_upper - tlb_slope_ph * tlb_length)
+        line.set_xy2(tlb_uptl, bar_index - tlb_offset + 1, tlb_backpaint ? tlb_ph - tlb_slope : tlb_upper - tlb_slope_ph * (tlb_length + 1))
+    if not na(tlb_pl) and tlb_showExt
+        line.set_xy1(tlb_dntl, bar_index - tlb_offset, tlb_backpaint ? tlb_pl : tlb_lower + tlb_slope_pl * tlb_length)
+        line.set_xy2(tlb_dntl, bar_index - tlb_offset + 1, tlb_backpaint ? tlb_pl + tlb_slope : tlb_lower + tlb_slope_pl * (tlb_length + 1))
+plot(show_TrendlinesWithBreaks ? (tlb_backpaint ? tlb_upper : tlb_upper - tlb_slope_ph * tlb_length) : na, "TLB Upper", color = not na(tlb_ph) ? na : tlb_upCss, offset = -tlb_offset)
+plot(show_TrendlinesWithBreaks ? (tlb_backpaint ? tlb_lower : tlb_lower + tlb_slope_pl * tlb_length) : na, "TLB Lower", color = not na(tlb_pl) ? na : tlb_dnCss, offset = -tlb_offset)
+plotshape(show_TrendlinesWithBreaks and tlb_upos > tlb_upos[1] ? low : na, "Upper Break", shape.labelup, location.absolute, tlb_upCss, text = "B", textcolor = color.white, size = size.tiny)
+plotshape(show_TrendlinesWithBreaks and tlb_dnos > tlb_dnos[1] ? high : na, "Lower Break", shape.labeldown, location.absolute, tlb_dnCss, text = "B", textcolor = color.white, size = size.tiny)
+alertcondition(show_TrendlinesWithBreaks and tlb_upos > tlb_upos[1], "Upward Breakout", "Price broke the down-trendline upward")
+alertcondition(show_TrendlinesWithBreaks and tlb_dnos > tlb_dnos[1], "Downward Breakout", "Price broke the up-trendline downward")
+
+vt_ema_swma(x, length) => ta.ema(x[3] * 1 / 6 + x[2] * 2 / 6 + x[1] * 2 / 6 + x[0] * 1 / 6, length)
+var float vt_upper = na
+var float vt_lower = na
+var float vt_lower_vol = na
+var float vt_upper_vol = na
+var float vt_step_up = na
+var float vt_step_dn = na
+var int vt_last_index = na
+float vt_atr = ta.atr(200)
+float vt_ema1 = vt_ema_swma(close, vt_length)
+float vt_ema2 = ta.ema(close, vt_length)
+bool vt_trend = vt_ema1[1] < vt_ema2
+if show_VolumaticTrend and vt_trend != vt_trend[1]
+    vt_upper := vt_ema1 + vt_atr * 3
+    vt_lower := vt_ema1 - vt_atr * 3
+    vt_lower_vol := vt_lower + vt_atr * 4
+    vt_upper_vol := vt_upper - vt_atr * 4
+    vt_step_up := (vt_lower_vol - vt_lower) / 100
+    vt_step_dn := (vt_upper - vt_upper_vol) / 100
+    vt_last_index := bar_index
+int vt_vol = int(volume / ta.percentile_linear_interpolation(volume, 1000, 100) * 100)
+float vt_vol_up = vt_step_up * vt_vol
+float vt_vol_dn = vt_step_dn * vt_vol
+color vt_color = vt_trend ? vt_color_up : vt_color_dn
+color vt_grad_col = color.from_gradient(vt_vol, 0, 25, chart.bg_color, vt_color)
+color vt_grad_col1 = color.from_gradient(vt_vol, 0, 10, chart.bg_color, vt_color)
+color vt_col_vol_up = vt_trend ? vt_grad_col : color(na)
+color vt_col_vol_dn = not vt_trend ? vt_grad_col : color(na)
+plotcandle(show_VolumaticTrend ? open : na, show_VolumaticTrend ? high : na, show_VolumaticTrend ? low : na, show_VolumaticTrend ? close : na, title = "Volumatic Candles Trend", color = vt_grad_col1, wickcolor = vt_grad_col1, bordercolor = vt_grad_col1, force_overlay = true)
+plotcandle(show_VolumaticTrend and vt_vol_h ? vt_lower : na, show_VolumaticTrend and vt_vol_h ? vt_lower : na, show_VolumaticTrend and vt_vol_h ? vt_lower + vt_vol_up : na, show_VolumaticTrend and vt_vol_h ? vt_lower + vt_vol_up : na, title = "Volume Up Trend", color = vt_col_vol_up, wickcolor = vt_col_vol_up, bordercolor = vt_col_vol_up, editable = false, force_overlay = true)
+plotcandle(show_VolumaticTrend and vt_vol_h ? vt_upper : na, show_VolumaticTrend and vt_vol_h ? vt_upper : na, show_VolumaticTrend and vt_vol_h ? vt_upper - vt_vol_dn : na, show_VolumaticTrend and vt_vol_h ? vt_upper - vt_vol_dn : na, title = "Volume Down Trend", color = vt_col_vol_dn, wickcolor = vt_col_vol_dn, bordercolor = vt_col_vol_dn, editable = false, force_overlay = true)
+plot(show_VolumaticTrend and vt_vol_h ? (vt_trend ? na : vt_upper) : na, color = vt_color, style = plot.style_linebr)
+plot(show_VolumaticTrend and vt_vol_h ? (vt_trend ? vt_lower : na) : na, color = vt_color, style = plot.style_linebr)
+plot(show_VolumaticTrend ? vt_ema1 : na, "Volumatic Trend Line", color = color.new(vt_color, 20), linewidth = 2)
+plotshape(show_VolumaticTrend and vt_trend != vt_trend[1] ? vt_ema1[1] : na, "Trend Change", shape.diamond, location.absolute, color = vt_color, size = size.tiny, offset = -1)
+var label vt_lblb = na
+if show_VolumaticTrend and barstate.islast and not na(vt_last_index)
+    float vt_delta = 0.
+    float vt_total = 0.
+    float vt_volumeSigned = close > open ? volume : -volume
+    for vt_i = 0 to (bar_index - vt_last_index)
+        vt_total += volume[vt_i]
+        vt_delta += close[vt_i] > open[vt_i] ? volume[vt_i] : -volume[vt_i]
+    label.delete(vt_lblb)
+    vt_lblb := label.new(bar_index, vt_vol_h ? (vt_trend ? vt_lower + vt_vol_up : vt_upper - vt_vol_dn) : vt_ema1, "Delta > " + str.tostring(vt_delta, format.volume) + "\n--------------------\nTotal > " + str.tostring(vt_total, format.volume), textalign = text.align_left, style = label.style_label_left, color = vt_grad_col1)
+if not show_VolumaticTrend
+    label.delete(vt_lblb)
+
+plotshape(show_OrderblocksNephewSam and obs_showFractals and obs_isFractalHigh(), title = "OBS Fractal High", style = shape.triangledown, location = location.abovebar, color = color.new(color.red, 0), offset = obs_filterFractal == "3" ? -1 : -2, size = size.auto)
+plotshape(show_OrderblocksNephewSam and obs_showFractals and obs_isFractalLow(), title = "OBS Fractal Low", style = shape.triangleup, location = location.belowbar, color = color.new(color.blue, 0), offset = obs_filterFractal == "3" ? -1 : -2, size = size.auto)
+
+color merged_bar_color = not na(ow_barColor) ? ow_barColor : not na(smc_barColor) ? smc_barColor : not na(rsi_barColor) ? rsi_barColor : not na(macd_barColor) ? macd_barColor : na
+color merged_bg_color = not na(ema_bgColor) ? ema_bgColor : not na(macd_bgColor) ? macd_bgColor : show_ATRRatio and atrr_showZones ? atrr_ruleState == 1 ? color.new(color.lime, 90) : atrr_ruleState == -1 ? color.new(color.yellow, 90) : color.new(color.red, 90) : na
+barcolor(merged_bar_color)
+bgcolor(merged_bg_color)
+
+alertcondition(show_SmartMoneyConcept and smc_bullBreak, "SMC Bullish Break", smc_bullChoch ? "SMC Bullish CHoCH" : "SMC Bullish BOS")
+alertcondition(show_SmartMoneyConcept and smc_bearBreak, "SMC Bearish Break", smc_bearChoch ? "SMC Bearish CHoCH" : "SMC Bearish BOS")
+alertcondition(show_SmartMoneyConcept and smc_bullObSignal, "SMC Bullish Order Block", "SMC Bullish Order Block created")
+alertcondition(show_SmartMoneyConcept and smc_bearObSignal, "SMC Bearish Order Block", "SMC Bearish Order Block created")
+alertcondition(show_SmartMoneyConcept and smc_bullFvgSignal, "SMC Bullish FVG", "SMC Bullish FVG created")
+alertcondition(show_SmartMoneyConcept and smc_bearFvgSignal, "SMC Bearish FVG", "SMC Bearish FVG created")
+alertcondition(show_TrendlinesWithBreaks and tlb_upos > tlb_upos[1], "Trendlines Upward Breakout", "Price broke the down-trendline upward")
+alertcondition(show_TrendlinesWithBreaks and tlb_dnos > tlb_dnos[1], "Trendlines Downward Breakout", "Price broke the up-trendline downward")
+
+// Changelog:
+// - Refactored the 12 sources into module-prefixed namespaces, consolidated shared utilities, and gated every plot/shape/fill/alert off the requested top-level toggles.
+// - Pane-native sources (RSI, MACD, ATR Ratio) are rendered as compact overlay tracks to keep the script overlay-safe in one merged indicator.
+// - Smart Money Concepts was merged as a behavior-faithful overlay subset: swing BOS/CHoCH, sweeps, equal highs/lows, order blocks, FVGs, and candle trend coloring are preserved, while the source's deeper internal structure and volumetric micro-metrics were simplified to stay compile-oriented in a single merged script.
